@@ -1,0 +1,41 @@
+<svg width="140" height="70" viewBox="0 0 140 70" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<filter id="softBlur" x="-40%" y="-40%" width="180%" height="180%">
+<feGaussianBlur stdDeviation="7" />
+</filter>
+</defs>
+
+<!-- Only the visible top/tip area of the triangles is inside this viewBox -->
+
+<!-- outer rose -->
+<polygon
+points="70,-10 128,102 12,102"
+fill="#f472b6"
+opacity="0.28"
+filter="url(#softBlur)"
+/>
+
+<!-- coral -->
+<polygon
+points="70,0 116,92 24,92"
+fill="#fb7185"
+opacity="0.32"
+filter="url(#softBlur)"
+/>
+
+<!-- peach -->
+<polygon
+points="70,10 104,84 36,84"
+fill="#fb923c"
+opacity="0.36"
+filter="url(#softBlur)"
+/>
+
+<!-- soft gold tip -->
+<polygon
+points="70,18 94,70 46,70"
+fill="#fde68a"
+opacity="0.34"
+filter="url(#softBlur)"
+/>
+</svg>

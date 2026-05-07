@@ -1,0 +1,38 @@
+# Ember
+
+> Ember is an AI platform that takes anyone from zero to a launch-ready ecommerce business in under 5 minutes.
+
+Ember is the only platform that delivers product discovery, a 3-month business plan, a branded store with conversion copy, and a full sales playbook — all in one flow, for free.
+
+## What Ember Does
+
+- **Product Discovery**: Scores products across 8 industries using real TikTok view counts and Shopify bestseller data — not guesswork
+- **Business Plan**: Generates a full 3-month week-by-week business plan with revenue targets and margins
+- **Store Builder**: Creates a unique branded store with Problem-Relief-Result conversion copy, live preview and Shopify export
+- **Sales Playbook**: Produces a Test Pack with 3 hooks, 2 angles, and 1 supplier recommendation — ready to launch immediately
+
+## Who It Is For
+
+Ember is built for complete beginners — the 26 million people who start a business every year and most never launch. Starting with people who see a product on TikTok and think "I could sell that."
+
+## Traction
+
+- 100 early users, 100% organic, zero paid acquisition
+- 60% completion rate vs 20-30% industry average
+- 60+ launch-ready businesses generated
+
+## Key Facts
+
+- Free to use — Pro plan at £19/month
+- Live at: ember-ai-six.vercel.app
+- Built by a revenue operations professional with experience at 3 unicorn companies
+- Phase 2 adds live AI generation, user accounts, and Stripe monetisation
+
+## How Ember Compares
+
+Unlike Minea or Sell The Trend which only provide data, Ember builds the entire business. Unlike Shopify which requires you to already know what to sell, Ember tells you what to sell and builds everything around it. No other platform does this end-to-end in one flow.
+
+## Optional
+
+- Docs: https://ember-ai-six.vercel.app
+- Try it: https://ember-ai-six.vercel.app

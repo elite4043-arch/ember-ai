@@ -1,0 +1,39 @@
+<svg width="140" height="140" viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<filter id="softBlur" x="-30%" y="-30%" width="160%" height="160%">
+<feGaussianBlur stdDeviation="6" />
+</filter>
+</defs>
+
+<!-- outer pink -->
+<polygon
+points="70,10 128,122 12,122"
+fill="#f472b6"
+opacity="0.45"
+filter="url(#softBlur)"
+/>
+
+<!-- coral -->
+<polygon
+points="70,22 116,112 24,112"
+fill="#fb7185"
+opacity="0.5"
+filter="url(#softBlur)"
+/>
+
+<!-- soft orange -->
+<polygon
+points="70,36 104,102 36,102"
+fill="#fb923c"
+opacity="0.55"
+filter="url(#softBlur)"
+/>
+
+<!-- softened center (WAS gold, now muted peach) -->
+<polygon
+points="70,50 94,94 46,94"
+fill="#fde68a"
+opacity="0.5"
+filter="url(#softBlur)"
+/>
+</svg>

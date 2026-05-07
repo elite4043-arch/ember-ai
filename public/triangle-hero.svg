@@ -1,0 +1,21 @@
+<svg width="600" height="600" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="sunsetGradient" x1="300" y1="0" x2="300" y2="600" gradientUnits="userSpaceOnUse">
+<stop offset="0%" stop-color="#fde68a"/>
+<stop offset="30%" stop-color="#fb923c"/>
+<stop offset="65%" stop-color="#fb7185"/>
+<stop offset="100%" stop-color="#f472b6"/>
+</linearGradient>
+
+<filter id="blur" x="-30%" y="-30%" width="160%" height="160%">
+<feGaussianBlur stdDeviation="80" />
+</filter>
+</defs>
+
+<polygon
+points="300,0 580,520 20,520"
+fill="url(#sunsetGradient)"
+filter="url(#blur)"
+opacity="0.85"
+/>
+</svg>
