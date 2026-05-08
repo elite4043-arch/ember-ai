@@ -1023,6 +1023,16 @@ export default function Home() {
               </div>
             </div>
           )}
+
+          {/* AI disclaimer */}
+          {isIdle && (
+            <div style={{ textAlign:"center", padding:"16px 24px 32px", position:"relative", zIndex:2 }}>
+              <p style={{ fontSize:"11px", color:"rgba(0,0,0,0.35)", margin:0, lineHeight:1.6 }}>
+                Ember uses AI to generate business ideas, plans and store content. AI can make mistakes — always verify market data, supplier information and financial projections independently before making business decisions.
+              </p>
+            </div>
+          )}
+
         </section>
 
         {isResults && (
