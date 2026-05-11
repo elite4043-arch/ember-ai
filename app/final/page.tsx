@@ -367,7 +367,7 @@ export default function FinalPage() {
                 if (navigator.share) { try { await navigator.share(shareData); } catch {} }
                 else { await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`); copyText("Copied!", "share"); }
               }}
-              style={{ padding:"11px 18px", borderRadius:"13px", border:"none",
+              style={{ padding:"11px 18px", borderRadius:"13px",
                 background:"rgba(255,255,255,0.9)", color:"#374151", fontWeight:700, fontSize:"13px", cursor:"pointer",
                 border:"1px solid rgba(0,0,0,0.08)" }}>
               {copied === "share" ? "✓ Shared!" : "📤 Share"}
