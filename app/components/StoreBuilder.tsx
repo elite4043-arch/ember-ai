@@ -77,13 +77,14 @@ function getProductImage(name: string): string {
 
 function getDefaultStyles(template: Template, brandColor: string): Record<string, ElemStyle> {
   const dark = template === 1;
+  const warm = template === 4;
   return {
-    brand:       { color: dark ? "#ffffff" : "#111827", size: "lg",  weight: "extrabold", align: "left"   },
-    headline:    { color: "#ffffff",  size: "xl",  weight: "extrabold", align: "left"   },
-    subheadline: { color: "rgba(255,255,255,0.85)", size: "md", weight: "normal", align: "left" },
-    price:       { color: brandColor, size: "xl",  weight: "extrabold", align: "left"   },
+    brand:       { color: dark ? "#ffffff" : warm ? "#e8d5c4" : "#111827", size: "lg",  weight: "extrabold", align: "left"   },
+    headline:    { color: dark ? "#ffffff" : warm ? "#e8d5c4" : "#111827", size: "xl",  weight: "extrabold", align: "left"   },
+    subheadline: { color: dark ? "rgba(255,255,255,0.75)" : warm ? "rgba(232,213,196,0.7)" : "#4b5563", size: "md", weight: "normal", align: "left" },
+    price:       { color: dark ? "#ffffff" : warm ? "#e8d5c4" : brandColor, size: "xl", weight: "extrabold", align: "left"   },
     cta:         { color: "#ffffff",  size: "md",  weight: "bold",      align: "center" },
-    description: { color: dark ? "rgba(255,255,255,0.65)" : "#4b5563", size: "md", weight: "normal", align: "left" },
+    description: { color: dark ? "rgba(255,255,255,0.65)" : warm ? "#5a3a25" : "#4b5563", size: "md", weight: "normal", align: "left" },
   };
 }
 
@@ -337,6 +338,17 @@ function Template1({ store, es, openPopup, brandColor, br, rgb, img }: any) {
           ))}
         </div>
       </div>
+      {/* FAQ — Template 1 */}
+      <div style={{ padding:"64px 32px", background:"#111", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ fontSize:"11px", letterSpacing:"0.15em", textTransform:"uppercase" as const, color:"rgba(255,255,255,0.4)", marginBottom:"24px" }}>FAQ</div>
+        <div style={{ fontSize:"28px", fontWeight:800, color:"white", marginBottom:"32px" }}>Questions answered</div>
+        {[["How long does shipping take?","We ship within 1-2 business days. Standard delivery takes 3-5 days."],["What's your returns policy?","Full 30-day no-questions-asked return policy. Refunded in full."],["Do you offer a warranty?","Yes — 12-month warranty against manufacturing defects."],["How do I contact support?","Our team responds within 2 hours, 7 days a week."]].map(([q,a]) => (
+          <div key={q} style={{ borderBottom:"1px solid rgba(255,255,255,0.08)", padding:"20px 0" }}>
+            <div style={{ fontSize:"15px", fontWeight:700, color:"white", marginBottom:"8px" }}>{q}</div>
+            <div style={{ fontSize:"13px", color:"rgba(255,255,255,0.5)", lineHeight:1.75 }}>{a}</div>
+          </div>
+        ))}
+      </div>
       {/* Final CTA */}
       <div style={{ padding:"80px 32px", textAlign:"center" as const, background:`linear-gradient(135deg,#0a0a0a,rgba(${rgb},0.12))` }}>
         <SE field="price" value={store.price} elemStyle={es("price")} onClick={openPopup}
@@ -364,7 +376,7 @@ function Template2({ store, es, openPopup, brandColor, br, rgb, img }: any) {
         <div style={{ position:"absolute", inset:0, background:"linear-gradient(to right, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)" }} />
         {/* Nav */}
         <div style={{ position:"relative", zIndex:2, padding:"24px 40px", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid rgba(255,255,255,0.1)" }}>
-          <SE field="brand" value={store.brand} elemStyle={{ ...es("brand"), color:"white" }} onClick={openPopup}
+          <SE field="brand" value={store.brand} elemStyle={es("brand")} onClick={openPopup}
             extraStyle={{ fontSize:"20px", fontWeight:400, letterSpacing:"0.15em", textTransform:"uppercase" as const }} />
           <div style={{ display:"flex", gap:"32px", fontSize:"12px", color:"rgba(255,255,255,0.6)", letterSpacing:"0.1em", textTransform:"uppercase" as const, fontFamily:"-apple-system,sans-serif" }}>
             <span>Shop</span><span>About</span><span>FAQ</span>
@@ -380,7 +392,7 @@ function Template2({ store, es, openPopup, brandColor, br, rgb, img }: any) {
             extraStyle={{ fontSize:"clamp(32px,7vw,68px)", lineHeight:1.05, marginBottom:"20px", maxWidth:"550px", fontWeight:400 }} />
           <SE field="subheadline" value={store.subheadline} elemStyle={es("subheadline")} onClick={openPopup}
             extraStyle={{ fontSize:"16px", lineHeight:1.8, marginBottom:"36px", maxWidth:"420px", fontStyle:"italic" }} />
-          <SE field="price" value={store.price} elemStyle={{ ...es("price"), color:"white" }} onClick={openPopup}
+          <SE field="price" value={store.price} elemStyle={es("price")} onClick={openPopup}
             extraStyle={{ fontSize:"28px", fontWeight:700, marginBottom:"24px", fontFamily:"-apple-system,sans-serif" }} />
           <div style={{ display:"flex", gap:"16px", alignItems:"center" }}>
             <SE field="cta" value={store.cta} elemStyle={es("cta")} onClick={openPopup}
@@ -419,8 +431,20 @@ function Template2({ store, es, openPopup, brandColor, br, rgb, img }: any) {
           ))}
         </div>
       </div>
+      {/* FAQ — Template 2 */}
+      <div style={{ padding:"64px 40px", background:"#fafaf8", borderTop:"1px solid #e5e7eb" }}>
+        <div style={{ maxWidth:"680px", margin:"0 auto" }}>
+          <div style={{ fontSize:"32px", fontWeight:400, color:"#111827", marginBottom:"32px", textAlign:"center" as const }}>Frequently Asked</div>
+          {[["How long does shipping take?","We ship within 1-2 business days. Standard delivery takes 3-5 days."],["What's your returns policy?","Full 30-day no-questions-asked return policy."],["Do you offer a warranty?","Yes — 12-month warranty on all products."],["How do I contact support?","Our team responds within 2 hours, 7 days a week."]].map(([q,a]) => (
+            <div key={q} style={{ borderBottom:"1px solid #e5e7eb", padding:"20px 0" }}>
+              <div style={{ fontSize:"15px", fontWeight:600, color:"#111827", marginBottom:"8px", fontFamily:"-apple-system,sans-serif" }}>{q}</div>
+              <div style={{ fontSize:"13px", color:"#6b7280", lineHeight:1.75, fontFamily:"-apple-system,sans-serif" }}>{a}</div>
+            </div>
+          ))}
+        </div>
+      </div>
       {/* Final CTA */}
-      <div style={{ padding:"80px 40px", textAlign:"center" as const, background:"#fafaf8", borderTop:"1px solid #e5e7eb" }}>
+      <div style={{ padding:"80px 40px", textAlign:"center" as const, background:"white", borderTop:"1px solid #e5e7eb" }}>
         <div style={{ fontSize:"36px", fontWeight:400, color:"#111827", marginBottom:"16px" }}>Ready to begin?</div>
         <SE field="price" value={store.price} elemStyle={es("price")} onClick={openPopup}
           extraStyle={{ fontSize:"36px", marginBottom:"24px", justifyContent:"center", fontFamily:"-apple-system,sans-serif" }} />
@@ -446,7 +470,7 @@ function Template3({ store, es, openPopup, brandColor, br, rgb, img }: any) {
         <div style={{ position:"absolute", inset:0, background:`linear-gradient(135deg, rgba(${rgb},0.85) 0%, rgba(${rgb},0.4) 50%, rgba(0,0,0,0.6) 100%)` }} />
         {/* Nav */}
         <div style={{ position:"relative", zIndex:2, padding:"20px 40px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <SE field="brand" value={store.brand} elemStyle={{ ...es("brand"), color:"white" }} onClick={openPopup}
+          <SE field="brand" value={store.brand} elemStyle={es("brand")} onClick={openPopup}
             extraStyle={{ fontSize:"20px", fontWeight:800, letterSpacing:"-0.02em" }} />
           <div style={{ display:"flex", gap:"28px", fontSize:"13px", color:"rgba(255,255,255,0.75)", fontWeight:600 }}>
             <span>Shop</span><span>About</span><span>Reviews</span>
@@ -468,7 +492,7 @@ function Template3({ store, es, openPopup, brandColor, br, rgb, img }: any) {
           <SE field="subheadline" value={store.subheadline} elemStyle={es("subheadline")} onClick={openPopup}
             extraStyle={{ fontSize:"17px", lineHeight:1.7, marginBottom:"32px", maxWidth:"500px" }} />
           <div style={{ display:"flex", gap:"16px", alignItems:"center", marginBottom:"20px" }}>
-            <SE field="price" value={store.price} elemStyle={{ ...es("price"), color:"white" }} onClick={openPopup}
+            <SE field="price" value={store.price} elemStyle={es("price")} onClick={openPopup}
               extraStyle={{ fontSize:"40px", fontWeight:800 }} />
             <div style={{ fontSize:"12px", color:"rgba(255,255,255,0.5)" }}>Free shipping</div>
           </div>
@@ -509,10 +533,23 @@ function Template3({ store, es, openPopup, brandColor, br, rgb, img }: any) {
           ))}
         </div>
       </div>
+      {/* FAQ — Template 3 */}
+      <div style={{ padding:"64px 40px", borderTop:"1px solid #e5e7eb" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"16px", marginBottom:"32px" }}>
+          <div style={{ height:"4px", background:brandColor, width:"40px", borderRadius:"2px" }} />
+          <div style={{ fontSize:"28px", fontWeight:800, color:"#111827" }}>Questions?</div>
+        </div>
+        {[["How long does shipping take?","We ship within 1-2 business days. Standard delivery takes 3-5 days."],["What's your returns policy?","Full 30-day no-questions-asked return policy. Refunded in full."],["Do you offer a warranty?","Yes — 12-month warranty against manufacturing defects."],["How do I contact support?","Our team responds within 2 hours, 7 days a week."]].map(([q,a]) => (
+          <div key={q} style={{ borderBottom:"1px solid #e5e7eb", padding:"20px 0" }}>
+            <div style={{ fontSize:"15px", fontWeight:700, color:"#111827", marginBottom:"8px" }}>{q}</div>
+            <div style={{ fontSize:"13px", color:"#6b7280", lineHeight:1.75 }}>{a}</div>
+          </div>
+        ))}
+      </div>
       {/* Final CTA */}
       <div style={{ padding:"80px 40px", background:brandColor, textAlign:"center" as const }}>
         <div style={{ fontSize:"36px", fontWeight:800, color:"white", marginBottom:"12px" }}>Ready to get started?</div>
-        <SE field="price" value={store.price} elemStyle={{ ...es("price"), color:"white" }} onClick={openPopup}
+        <SE field="price" value={store.price} elemStyle={es("price")} onClick={openPopup}
           extraStyle={{ fontSize:"40px", fontWeight:800, marginBottom:"24px", justifyContent:"center" }} />
         <SE field="cta" value={store.cta} elemStyle={es("cta")} onClick={openPopup}
           extraStyle={{ display:"inline-block", padding:"16px 48px", background:"white", borderRadius:br, color:brandColor, fontWeight:800, fontSize:"16px" }} />
@@ -536,7 +573,7 @@ function Template4({ store, es, openPopup, brandColor, br, rgb, img }: any) {
         <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top, rgba(44,26,14,0.92) 0%, rgba(44,26,14,0.4) 50%, rgba(44,26,14,0.1) 100%)" }} />
         {/* Nav */}
         <div style={{ position:"relative", zIndex:2, padding:"24px 40px", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid rgba(232,213,196,0.15)" }}>
-          <SE field="brand" value={store.brand} elemStyle={{ ...es("brand"), color:"#e8d5c4" }} onClick={openPopup}
+          <SE field="brand" value={store.brand} elemStyle={es("brand")} onClick={openPopup}
             extraStyle={{ fontSize:"20px", fontWeight:400, letterSpacing:"0.15em", textTransform:"uppercase" as const }} />
           <div style={{ display:"flex", gap:"28px", fontSize:"12px", color:"rgba(232,213,196,0.55)", letterSpacing:"0.1em", fontFamily:"-apple-system,sans-serif" }}>
             <span>Shop</span><span>About</span><span>Reviews</span>
@@ -552,7 +589,7 @@ function Template4({ store, es, openPopup, brandColor, br, rgb, img }: any) {
             extraStyle={{ fontSize:"clamp(32px,7vw,64px)", lineHeight:1.05, letterSpacing:"-0.02em", marginBottom:"20px", maxWidth:"560px", fontWeight:400, color:"#e8d5c4" }} />
           <SE field="subheadline" value={store.subheadline} elemStyle={{ ...es("subheadline"), color:"rgba(232,213,196,0.7)" }} onClick={openPopup}
             extraStyle={{ fontSize:"16px", lineHeight:1.8, marginBottom:"36px", maxWidth:"440px", fontStyle:"italic" }} />
-          <SE field="price" value={store.price} elemStyle={{ ...es("price"), color:"#e8d5c4" }} onClick={openPopup}
+          <SE field="price" value={store.price} elemStyle={es("price")} onClick={openPopup}
             extraStyle={{ fontSize:"32px", fontWeight:700, marginBottom:"8px", fontFamily:"-apple-system,sans-serif" }} />
           <div style={{ fontSize:"12px", color:"rgba(232,213,196,0.4)", marginBottom:"24px", fontFamily:"-apple-system,sans-serif" }}>Complimentary shipping</div>
           <SE field="cta" value={store.cta} elemStyle={es("cta")} onClick={openPopup}
@@ -563,7 +600,7 @@ function Template4({ store, es, openPopup, brandColor, br, rgb, img }: any) {
       <div style={{ padding:"72px 40px", background:"#f5ede3", borderTop:"1px solid #e8d5c4" }}>
         <div style={{ maxWidth:"680px", margin:"0 auto", textAlign:"center" as const }}>
           <div style={{ fontSize:"10px", fontWeight:600, letterSpacing:"0.2em", textTransform:"uppercase" as const, color:brandColor, marginBottom:"16px", fontFamily:"-apple-system,sans-serif" }}>The story</div>
-          <SE field="description" value={store.description} elemStyle={{ ...es("description"), color:"#5a3a25" }} onClick={openPopup}
+          <SE field="description" value={store.description} elemStyle={es("description")} onClick={openPopup}
             extraStyle={{ lineHeight:2, fontSize:"17px" }} />
         </div>
       </div>
@@ -588,6 +625,18 @@ function Template4({ store, es, openPopup, brandColor, br, rgb, img }: any) {
               <div style={{ color:"#f59e0b", marginBottom:"10px", fontSize:"13px" }}>⭐⭐⭐⭐⭐</div>
               <p style={{ fontSize:"14px", color:"#5a3a25", lineHeight:1.8, marginBottom:"12px", fontStyle:"italic" }}>"{text}"</p>
               <div style={{ fontSize:"12px", fontWeight:600, color:"#2c1a0e", fontFamily:"-apple-system,sans-serif" }}>{name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* FAQ — Template 4 */}
+      <div style={{ padding:"64px 40px", borderTop:"1px solid #e8d5c4" }}>
+        <div style={{ maxWidth:"680px", margin:"0 auto" }}>
+          <div style={{ fontSize:"28px", fontWeight:400, color:"#2c1a0e", marginBottom:"32px", textAlign:"center" as const }}>Questions & Answers</div>
+          {[["How long does shipping take?","We ship within 1-2 business days. Standard delivery takes 3-5 days."],["What's your returns policy?","Full 30-day no-questions-asked return policy."],["Do you offer a warranty?","Yes — 12-month warranty on all products."],["How do I contact support?","Our team responds within 2 hours, 7 days a week."]].map(([q,a]) => (
+            <div key={q} style={{ borderBottom:"1px solid #e8d5c4", padding:"20px 0" }}>
+              <div style={{ fontSize:"15px", fontWeight:600, color:"#2c1a0e", marginBottom:"8px", fontFamily:"-apple-system,sans-serif" }}>{q}</div>
+              <div style={{ fontSize:"13px", color:"#9b7b5e", lineHeight:1.75, fontFamily:"-apple-system,sans-serif" }}>{a}</div>
             </div>
           ))}
         </div>
@@ -664,8 +713,11 @@ export default function StoreBuilder({
   function handleSave(value: string, style: ElemStyle) {
     if (!popup) return;
     const field = popup.field;
-    onUpdateField(field as keyof StoreData, value);
+    // Update elem styles first
     setElemStyles(prev => ({ ...prev, [field]: style }));
+    // Then update the store field
+    onUpdateField(field as keyof StoreData, value);
+    // Close popup last
     setPopup(null);
   }
 

@@ -406,27 +406,6 @@ export default function Home() {
       if (!res.ok) throw new Error(`Sell API failed: ${res.status}`);
       const data = await res.json();
       setActiveSell(data.sell || null);
-
-      // ── Send store email ──────────────────────────────────────
-      if (userEmail && activeStore) {
-        try {
-          const storeHTML = generateStoreHTML(activeStore, brandColor, storeProductName);
-          await fetch("/api/send-store", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: userEmail,
-              brandName: activeStore.brand,
-              productName: storeProductName,
-              storeHTML,
-            }),
-          });
-          console.log("Store email sent to", userEmail);
-        } catch (emailErr) {
-          console.error("Email send failed (non-blocking):", emailErr);
-        }
-      }
-
     } catch (e) { console.error("SELL ERROR:", e); setActiveSell(null); }
     finally { setSellLoading(false); }
   }
@@ -963,7 +942,29 @@ export default function Home() {
                   onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.9)"; }}
                   style={secondaryButton}>← Back to ideas</button>
                 <button className="ripple-btn"
-                  onClick={() => window.location.href = "/final"}
+                  onClick={async () => {
+                    // Send email first then navigate
+                    if (userEmail && activeStore) {
+                      try {
+                        const { generateStoreHTML } = await import("@/app/lib/generateStoreHTML");
+                        const storeHTML = generateStoreHTML(activeStore, brandColor, storeProductName);
+                        await fetch("/api/send-store", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            email: userEmail,
+                            brandName: activeStore.brand,
+                            productName: storeProductName,
+                            storeHTML,
+                            planSummary: activePlan ? `${activePlan.slice(0, 300)}...` : null,
+                          }),
+                        });
+                      } catch (e) {
+                        console.error("Email send failed:", e);
+                      }
+                    }
+                    window.location.href = "/final";
+                  }}
                   onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px) scale(1.03)"; e.currentTarget.style.boxShadow = "0 20px 48px rgba(234,88,12,0.36)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0) scale(1)"; e.currentTarget.style.boxShadow = "0 14px 36px rgba(234,88,12,0.22)"; }}
                   style={{ ...unlockButton, width:"100%" } as React.CSSProperties}>
@@ -1025,10 +1026,10 @@ export default function Home() {
           )}
 
           {/* AI disclaimer */}
-          {isIdle && (
-            <div style={{ textAlign:"center", padding:"16px 24px 32px", position:"relative", zIndex:2 }}>
-              <p style={{ fontSize:"11px", color:"rgba(0,0,0,0.35)", margin:0, lineHeight:1.6 }}>
-                Ember uses AI to generate business ideas, plans and store content. AI can make mistakes — always verify market data, supplier information and financial projections independently before making business decisions.
+          {isResults && (
+            <div style={{ position:"fixed", bottom:"12px", left:0, right:0, textAlign:"center", zIndex:2, pointerEvents:"none" }}>
+              <p style={{ fontSize:"11px", color:"rgba(0,0,0,0.3)", margin:0 }}>
+                AI can make mistakes. Always verify before making business decisions.
               </p>
             </div>
           )}
@@ -1145,7 +1146,7 @@ export default function Home() {
                         onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px) scale(1.03)"; e.currentTarget.style.boxShadow = "0 10px 22px rgba(234,88,12,0.28)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0) scale(1)"; e.currentTarget.style.boxShadow = "0 6px 16px rgba(234,88,12,0.2)"; }}
                         style={{ border:"none", borderRadius:"12px", padding:"10px 16px", background:`linear-gradient(135deg,${COLOURS.amber} 0%,${COLOURS.orange} 50%,${COLOURS.red} 100%)`, color:"white", fontWeight:700, fontSize:"14px", cursor:"pointer", transition:"all 0.2s ease", boxShadow:"0 6px 16px rgba(234,88,12,0.2)", position:"relative", overflow:"hidden" }}>
-                        Plan & build →
+                        Plan &amp; build →
                       </button>
                     </div>
 

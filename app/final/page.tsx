@@ -348,29 +348,28 @@ export default function FinalPage() {
 
         {/* Share + CTA */}
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"12px" }}>
-          <div style={{ fontSize:"13px", color:"#9ca3af", fontWeight:600 }}>Share what you just built 🔥</div>
-          <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", justifyContent:"center" }}>
+          <div style={{ fontSize:"13px", color:"#9ca3af", fontWeight:600 }}>What would you like to do next?</div>
 
-            {/* Native share — works on mobile like iOS share sheet */}
+          {/* Dashboard — primary CTA */}
+          <button
+            onClick={() => window.location.href = "/dashboard"}
+            style={{ width:"100%", maxWidth:"360px", padding:"14px 28px", borderRadius:"14px", border:"none",
+              background:`linear-gradient(135deg,${COLOURS.yellow},${COLOURS.amber},${COLOURS.orange},${COLOURS.red},${COLOURS.pink})`,
+              color:"white", fontWeight:800, fontSize:"15px", cursor:"pointer",
+              boxShadow:"0 8px 28px rgba(234,88,12,0.35)", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px" }}>
+            <span>📊</span> View your dashboard
+          </button>
+
+          <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", justifyContent:"center" }}>
             <button
               onClick={async () => {
-                const shareData = {
-                  title: "I built a business with Ember AI 🔥",
-                  text: "I just built a complete ecommerce business in under 5 minutes — plan, store, sales playbook, all done.",
-                  url: "https://ember-ai-six.vercel.app",
-                };
-                if (navigator.share) {
-                  try { await navigator.share(shareData); }
-                  catch (e) { /* user dismissed */ }
-                } else {
-                  await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
-                  copyText("Copied!", "share");
-                }
+                const shareData = { title:"I built a business with Ember AI 🔥", text:"I just built a complete ecommerce business in under 5 minutes — plan, store, sales playbook, all done.", url:"https://ember-ai-six.vercel.app" };
+                if (navigator.share) { try { await navigator.share(shareData); } catch {} }
+                else { await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`); copyText("Copied!", "share"); }
               }}
               style={{ padding:"11px 18px", borderRadius:"13px", border:"none",
-                background:`linear-gradient(135deg,${COLOURS.amber},${COLOURS.orange},${COLOURS.pink})`,
-                color:"white", fontWeight:700, fontSize:"13px", cursor:"pointer",
-                boxShadow:"0 8px 24px rgba(234,88,12,0.28)", display:"flex", alignItems:"center", gap:"6px" }}>
+                background:"rgba(255,255,255,0.9)", color:"#374151", fontWeight:700, fontSize:"13px", cursor:"pointer",
+                border:"1px solid rgba(0,0,0,0.08)" }}>
               {copied === "share" ? "✓ Shared!" : "📤 Share"}
             </button>
 
