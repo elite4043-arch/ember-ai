@@ -2,10 +2,13 @@
 
 import { generateStoreHTML, generateShopifySection } from "@/app/lib/generateStoreHTML";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSession, signIn } from "next-auth/react";
 import Background    from "@/app/components/shared/Background";
 import Keyframes     from "@/app/components/shared/Keyframes";
 import SignupModal   from "@/app/components/shared/SignupModal";
 import StoreBuilder  from "@/app/components/StoreBuilder";
+import dynamic from "next/dynamic";
+const EmberDemo = dynamic(() => import("@/app/components/EmberDemo"), { ssr: false });
 
 type Idea = {
   name:         string;
@@ -144,6 +147,7 @@ function getRect(el: HTMLElement | null) {
 export default function Home() {
   const [appState, setAppState]             = useState<AppState>("idle");
   const [prompt, setPrompt]                 = useState("");
+  const [showSignInModal, setShowSignInModal] = useState(false);
   const [ideas, setIdeas]                   = useState<Idea[]>([]);
   const [ideaTip, setIdeaTip]               = useState<string>("");
   const [selectedIdea, setSelectedIdea]     = useState("");
@@ -166,7 +170,10 @@ export default function Home() {
   const [signupEmail, setSignupEmail]       = useState("");
   const [signupStatus, setSignupStatus]     = useState<"idle"|"loading"|"success"|"error">("idle");
   const [signupTrigger, setSignupTrigger]   = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { data: session } = useSession();
   const [userEmail, setUserEmail]           = useState<string | null>(null);
+  const [pendingIdea, setPendingIdea]       = useState<string | null>(null);
   const [saveStatus, setSaveStatus]         = useState<"idle"|"saving"|"saved">("idle");
   const saveTimeoutRef                      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [storeView, setStoreView]           = useState<StoreView>("preview");
@@ -435,7 +442,7 @@ export default function Home() {
     setTimeout(() => setCopyFeedback(""), 2500);
   }
 
-  /* ─── Shared background ──────────────────────────────────────── */
+  /* - Shared background - */
 
   // Responsive pill count
   const [pillCount, setPillCount] = useState(5);
@@ -462,11 +469,117 @@ export default function Home() {
         signupStatus={signupStatus}
         onSubmit={submitSignup}
       />
+
+      {/* Sign in modal */}
+      {showSignInModal && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setShowSignInModal(false)}
+            style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:200, backdropFilter:"blur(4px)", animation:"fadeIn 0.2s ease" }} />
+
+          {/* Modal card */}
+          <div style={{
+            position:"fixed", top:"50%", left:"50%",
+            transform:"translate(-50%,-50%)",
+            zIndex:201, width:"100%", maxWidth:"420px",
+            background:"rgba(255,255,255,0.98)",
+            borderRadius:"20px", padding:"36px",
+            boxShadow:"0 24px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.06)",
+            animation:"fadeInUp 0.3s cubic-bezier(0.22,1,0.36,1)",
+          }}>
+            {/* Close */}
+            <button
+              onClick={() => setShowSignInModal(false)}
+              style={{ position:"absolute" as const, top:"14px", right:"14px", width:"30px", height:"30px", borderRadius:"50%", border:"none", background:"rgba(0,0,0,0.06)", cursor:"pointer", fontSize:"16px", color:"#6b7280", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              ×
+            </button>
+
+            {/* Logo */}
+            <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"20px" }}>
+              <img src="/favicon.svg" alt="Ember" style={{ width:"34px", height:"34px" }} />
+              <span style={{ fontWeight:800, fontSize:"17px", letterSpacing:"-0.03em", color:"#111827" }}>Ember</span>
+            </div>
+
+            {/* Title */}
+            <div style={{ marginBottom:"24px" }}>
+              <div style={{ fontSize:"14px", color:"#6b7280", marginBottom:"4px" }}>Start building.</div>
+              <div style={{ fontSize:"22px", fontWeight:800, color:"#111827", letterSpacing:"-0.03em" }}>Log in to your account</div>
+            </div>
+
+            {/* Google button */}
+            <button
+              onClick={async () => {
+                setShowSignInModal(false);
+                const { signIn } = await import("next-auth/react");
+                signIn("google", { callbackUrl: "/" });
+              }}
+              style={{ width:"100%", padding:"13px 16px", borderRadius:"12px", border:"1.5px solid rgba(0,0,0,0.12)", background:"white", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"10px", fontSize:"15px", fontWeight:600, color:"#111827", marginBottom:"12px", boxShadow:"0 2px 8px rgba(0,0,0,0.06)", transition:"all 0.2s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background="rgba(0,0,0,0.02)"; e.currentTarget.style.transform="translateY(-1px)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background="white"; e.currentTarget.style.transform="translateY(0)"; }}>
+              <svg width="18" height="18" viewBox="0 0 18 18">
+                <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+                <path d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z" fill="#EA4335"/>
+              </svg>
+              Continue with Google
+            </button>
+
+            {/* Divider */}
+            <div style={{ display:"flex", alignItems:"center", gap:"12px", margin:"16px 0" }}>
+              <div style={{ flex:1, height:"1px", background:"rgba(0,0,0,0.08)" }} />
+              <span style={{ fontSize:"12px", color:"#9ca3af", fontWeight:500 }}>OR</span>
+              <div style={{ flex:1, height:"1px", background:"rgba(0,0,0,0.08)" }} />
+            </div>
+
+            {/* Email input */}
+            <input
+              type="email"
+              placeholder="name@example.com"
+              style={{ width:"100%", padding:"13px 16px", borderRadius:"12px", border:"1.5px solid rgba(0,0,0,0.12)", fontSize:"15px", color:"#111827", background:"white", outline:"none", marginBottom:"10px", boxSizing:"border-box" as const }}
+              onFocus={(e) => { e.target.style.borderColor="#EA580C"; }}
+              onBlur={(e) => { e.target.style.borderColor="rgba(0,0,0,0.12)"; }}
+            />
+            <button
+              style={{ width:"100%", padding:"13px 16px", borderRadius:"12px", border:"none", background:"#111827", color:"white", fontSize:"15px", fontWeight:700, cursor:"pointer", transition:"all 0.2s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background="#1f2937"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background="#111827"; }}>
+              Continue with email
+            </button>
+
+            {/* Terms */}
+            <div style={{ fontSize:"12px", color:"#9ca3af", textAlign:"center" as const, marginTop:"18px", lineHeight:1.6 }}>
+              By continuing you agree to our Terms and Privacy Policy
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 
-  /* ─── Navbar ─────────────────────────────────────────────────── */
+  /* - Navbar - */
   const [scrolled, setScrolled] = useState(false);
+  // Sync Google session email to userEmail
+  useEffect(() => {
+    if (session?.user?.email) {
+      setUserEmail(session.user.email);
+      // If there was a pending idea waiting for sign in — resume it
+      const pending = localStorage.getItem("ember-pending-idea");
+      if (pending) {
+        localStorage.removeItem("ember-pending-idea");
+        setPendingIdea(pending);
+      }
+    }
+  }, [session?.user?.email]);
+
+  // Resume plan generation after sign in
+  useEffect(() => {
+    if (pendingIdea && userEmail) {
+      setPendingIdea(null);
+      generatePlan(pendingIdea);
+    }
+  }, [pendingIdea, userEmail]);
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", handler, { passive: true });
@@ -482,7 +595,7 @@ export default function Home() {
   const navbar = (
     <div style={{
       position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
-      padding: "0 32px",
+      padding: "0 24px",
       height: "64px",
       display: "flex", alignItems: "center", justifyContent: "space-between",
       background: scrolled ? "rgba(255,255,255,0.75)" : "transparent",
@@ -491,28 +604,111 @@ export default function Home() {
       WebkitBackdropFilter: scrolled ? "blur(20px)" : "none",
       transition: "all 0.4s ease",
     }}>
-      <div onClick={resetToIdle} style={{ display:"flex", alignItems:"center", gap:"10px", cursor:"pointer" }}>
+      {/* Logo */}
+      <div onClick={resetToIdle} style={{ display:"flex", alignItems:"center", gap:"10px", cursor:"pointer", flexShrink:0 }}>
         <img src="/favicon.svg" alt="Ember icon" style={{ width:"32px", height:"32px", objectFit:"contain" }} />
         <span style={{ fontWeight:800, fontSize:"21px", letterSpacing:"-0.03em", color:"#111827" }}>Ember</span>
       </div>
+
       {(appState === "idle" || appState === "results") && (
-        <div style={{ display:"flex", alignItems:"center", gap:"22px", fontSize:"14px", color:"#4b5563" }}>
-          <span style={{ cursor:"pointer" }}>How it works</span>
-        </div>
+        <>
+          {/* Desktop links */}
+          <div className="desktop-nav" style={{ display:"flex", alignItems:"center", gap:"16px" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"24px", fontSize:"14px", color:"#4b5563" }}>
+              <span onClick={resetToIdle} style={{ cursor:"pointer", fontWeight:500, transition:"color 0.2s" }}
+                onMouseEnter={(e)=>{e.currentTarget.style.color=COLOURS.orange;}}
+                onMouseLeave={(e)=>{e.currentTarget.style.color="#4b5563";}}>
+                How it works
+              </span>
+              <span onClick={()=>window.location.href="/pricing"} style={{ cursor:"pointer", fontWeight:500, transition:"color 0.2s" }}
+                onMouseEnter={(e)=>{e.currentTarget.style.color=COLOURS.orange;}}
+                onMouseLeave={(e)=>{e.currentTarget.style.color="#4b5563";}}>
+                Pricing
+              </span>
+            </div>
+            {session?.user ? (
+              <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                <div style={{ width:"36px", height:"36px", borderRadius:"50%", overflow:"hidden", border:`2px solid ${COLOURS.amber}`, flexShrink:0 }}>
+                  {session.user.image
+                    ? <img src={session.user.image} alt={session.user.name ?? ""} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                    : <div style={{ width:"100%", height:"100%", background:`linear-gradient(135deg,${COLOURS.amber},${COLOURS.orange})`, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontWeight:700, fontSize:"14px" }}>
+                        {session.user.email?.[0]?.toUpperCase()}
+                      </div>
+                  }
+                </div>
+                <span style={{ fontSize:"13px", color:"#6b7280", maxWidth:"120px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>
+                  {session.user.name?.split(" ")[0]}
+                </span>
+              </div>
+            ) : (
+              <button onClick={()=>setShowSignInModal(true)}
+                style={{ padding:"9px 24px", borderRadius:"999px", border:"none", background:`linear-gradient(135deg,${COLOURS.amber},${COLOURS.orange},${COLOURS.pink})`, color:"white", fontWeight:700, fontSize:"14px", cursor:"pointer", boxShadow:"0 4px 14px rgba(234,88,12,0.28)", transition:"transform 0.2s, box-shadow 0.2s" }}
+                onMouseEnter={(e)=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(234,88,12,0.35)";}}
+                onMouseLeave={(e)=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 4px 14px rgba(234,88,12,0.28)";}}>
+                Log in →
+              </button>
+            )}
+          </div>
+
+          {/* Mobile nav */}
+          <div className="mobile-nav" style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+            <button onClick={() => setShowSignInModal(true)}
+              style={{ padding:"8px 16px", borderRadius:"999px", border:"none", background:`linear-gradient(135deg,${COLOURS.amber},${COLOURS.orange},${COLOURS.pink})`, color:"white", fontWeight:700, fontSize:"13px", cursor:"pointer", boxShadow:"0 4px 14px rgba(234,88,12,0.28)" }}>
+              Log in →
+            </button>
+            <div style={{ position:"relative" }}>
+              <button onClick={()=>setMobileMenuOpen(!mobileMenuOpen)}
+                style={{ width:"38px", height:"38px", borderRadius:"10px", border:"1.5px solid rgba(0,0,0,0.12)", background:"white", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"5px", padding:"8px" }}>
+                <div style={{ width:"18px", height:"2px", borderRadius:"1px", background:"#374151" }} />
+                <div style={{ width:"18px", height:"2px", borderRadius:"1px", background:"#374151" }} />
+                <div style={{ width:"18px", height:"2px", borderRadius:"1px", background:"#374151" }} />
+              </button>
+              {mobileMenuOpen && (
+                <>
+                  <div onClick={()=>setMobileMenuOpen(false)} style={{ position:"fixed", inset:0, zIndex:98 }} />
+                  <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, background:"white", borderRadius:"14px", padding:"8px", minWidth:"200px", zIndex:99, boxShadow:"0 0 0 1px rgba(245,158,11,0.3),0 0 0 2.5px rgba(234,88,12,0.15),0 8px 32px rgba(0,0,0,0.12)", animation:"mfadeIn 0.2s ease forwards" }}>
+                    {[{label:"How it works",fn:resetToIdle},{label:"Pricing",fn:()=>window.location.href="/pricing"}].map((item,i)=>(
+                      <div key={i} onClick={()=>{item.fn();setMobileMenuOpen(false);}}
+                        style={{ padding:"12px 16px", borderRadius:"10px", fontSize:"15px", fontWeight:500, color:"#374151", cursor:"pointer" }}
+                        onMouseEnter={(e)=>{e.currentTarget.style.background="rgba(0,0,0,0.04)";}}
+                        onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";}}>
+                        {item.label}
+                      </div>
+                    ))}
+                    <div style={{ height:"1px", background:"rgba(0,0,0,0.07)", margin:"4px 8px" }} />
+                    <div onClick={()=>{setShowSignInModal(true);setMobileMenuOpen(false);}}
+                      style={{ padding:"12px 16px", borderRadius:"10px", fontSize:"15px", fontWeight:500, color:"#374151", cursor:"pointer" }}
+                      onMouseEnter={(e)=>{e.currentTarget.style.background="rgba(0,0,0,0.04)";}}
+                      onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";}}>
+                      Log in
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
       )}
+
       {appState === "plan" && <div style={{ fontSize:"14px", fontWeight:700, color:"#9a3412" }}>Step 2 — Business plan</div>}
       {appState === "store" && (
         <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-          {saveStatus === "saving" && <span style={{ fontSize:"12px", color:"#6b7280" }}>Saving…</span>}
-          {saveStatus === "saved"  && <span style={{ fontSize:"12px", color:COLOURS.orange, fontWeight:600 }}>✓ Saved</span>}
+          {saveStatus === "saving" && <span style={{ fontSize:"12px", color:"#6b7280" }}>Saving...</span>}
+          {saveStatus === "saved"  && <span style={{ fontSize:"12px", color:COLOURS.orange, fontWeight:600 }}>Saved</span>}
           <div style={{ fontSize:"14px", fontWeight:700, color:"#9a3412" }}>Step 3 — Store ready</div>
         </div>
       )}
       {appState === "sell" && <div style={{ fontSize:"14px", fontWeight:700, color:"#9a3412" }}>Step 4 — Get your first sales</div>}
+
+      <style>{`
+        @media(min-width:768px){.mobile-nav{display:none!important;}.desktop-nav{display:flex!important;}}
+        @media(max-width:767px){.mobile-nav{display:flex!important;}.desktop-nav{display:none!important;}}
+        @keyframes mfadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+      `}</style>
     </div>
   );
 
-  /* ─── Keyframes ──────────────────────────────────────────────── */
+  /* - Keyframes - */
   const keyframes = <Keyframes />;
 
   /* ════════════════════════════════════════════════════════════════
@@ -520,7 +716,7 @@ export default function Home() {
   ════════════════════════════════════════════════════════════════ */
   if (appState === "plan") {
 
-    // ── Parse the raw plan text ──────────────────────────────────
+    // - Parse the raw plan text -
     const rawPlan = activePlan || "";
 
     // Everything before the first ━━━ is the intro block
@@ -590,7 +786,7 @@ export default function Home() {
             </div>
           ) : (
             <>
-              {/* ── Intro cards row ── */}
+              {/* - Intro cards row - */}
               <div className="plan-intro-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))", gap:"14px", marginBottom:"16px" }}>
 
                 {/* Brand position */}
@@ -621,7 +817,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* ── First move strip ── */}
+              {/* - First move strip - */}
               <div style={{ background:"linear-gradient(135deg,rgba(234,88,12,0.1),rgba(253,224,71,0.07))", border:"1px solid rgba(234,88,12,0.22)", borderRadius:"18px", padding:"16px 20px", marginBottom:"16px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"16px", flexWrap:"wrap" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
                   <span style={{ fontSize:"20px" }}>👉</span>
@@ -637,7 +833,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* ── Month cards with full expandable detail ── */}
+              {/* - Month cards with full expandable detail - */}
               <div style={{ display:"flex", flexDirection:"column", gap:"12px", marginBottom:"16px" }}>
                 {monthBlocks.map((month, mi) => {
                   const meta       = monthMeta[mi] || monthMeta[2];
@@ -698,7 +894,7 @@ export default function Home() {
                 })}
               </div>
 
-              {/* ── Margins strip ── */}
+              {/* - Margins strip - */}
               {margins && (
                 <div style={{ background:"rgba(255,248,240,0.35)", backdropFilter:"blur(16px)", border:"1px solid rgba(0,0,0,0.08)", borderRadius:"18px", padding:"18px 24px", marginBottom:"20px", display:"flex", alignItems:"center", gap:"8px", flexWrap:"wrap" }}>
                   <span style={{ fontSize:"18px" }}>💰</span>
@@ -715,7 +911,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ── CTA buttons ── */}
+              {/* - CTA buttons - */}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", maxWidth:"480px" }}>
                 <button className="ripple-btn"
                   onClick={() => buildStore(selectedIdea)}
@@ -758,7 +954,7 @@ export default function Home() {
     );
   }
 
-    /* ════════════════════════════════════════════════════════════════
+  /* ════════════════════════════════════════════════════════════════
      SELL VIEW
   ════════════════════════════════════════════════════════════════ */
   if (appState === "sell") {
@@ -843,7 +1039,7 @@ export default function Home() {
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(249,250,251,0.9)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.06)"; }}>
                         <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
                           <div style={{ width:"18px", height:"18px", borderRadius:"50%", background:`linear-gradient(135deg,${["#FDE047","#F59E0B","#EA580C"][idx]},${["#F59E0B","#EA580C","#FB7185"][idx]})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"9px", fontWeight:800, color:"white", flexShrink:0 }}>H{idx+1}</div>
-                          <span style={{ fontSize:"13px", color:"#111827", lineHeight:1.55, fontWeight:500 }}>"{item}"</span>
+                          <span style={{ fontSize:"13px", color:"#111827", lineHeight:1.55, fontWeight:500 }}>&ldquo;{item}&rdquo;</span>
                         </div>
                         <span style={{ fontSize:"11px", color:"#9ca3af", flexShrink:0 }}>copy</span>
                       </div>
@@ -1036,6 +1232,16 @@ export default function Home() {
 
         </section>
 
+        {/* EmberDemo section */}
+        {appState === "idle" && (
+          <>
+            <div style={{ height:"120px", background:"linear-gradient(to bottom,rgba(255,253,248,0) 0%,rgba(255,253,248,1) 100%)", marginTop:"-20px", pointerEvents:"none" }} />
+            <section style={{ width:"100%", display:"flex", flexDirection:"column", alignItems:"center", paddingBottom:"80px", background:"#fffdf8" }}>
+              <EmberDemo />
+            </section>
+          </>
+        )}
+
         {isResults && (
           <section style={{ maxWidth:"760px", width:"100%", margin:"32px auto 0", padding:"0 24px 220px", animation:"fadeUp 0.45s ease forwards" }}>
             {loading && (
@@ -1050,7 +1256,7 @@ export default function Home() {
               <div style={{ textAlign:"center", padding:"48px 24px" }}>
                 <div style={{ fontSize:"48px", marginBottom:"16px" }}>🤔</div>
                 <div style={{ fontSize:"20px", fontWeight:700, color:"#111827", marginBottom:"8px" }}>
-                  We don't recognise that industry yet
+                  We don&apos;t recognise that industry yet
                 </div>
                 <div style={{ fontSize:"14px", color:"#6b7280", marginBottom:"32px", lineHeight:1.6, maxWidth:"420px", margin:"0 auto 32px" }}>
                   Ember currently covers 8 of the top trending industries. Try one of these to get started — more industries coming soon.
@@ -1067,12 +1273,12 @@ export default function Home() {
                   ))}
                 </div>
                 <div style={{ fontSize:"12px", color:"#9ca3af" }}>
-                  Want us to add your industry? We're tracking requests for Phase 2.
+                  Want us to add your industry? We&apos;re tracking requests for Phase 2.
                 </div>
               </div>
             )}
             {ideas.map((idea, index) => {
-              // ── Decision badge ──
+              // - Decision badge -
               const decision = idea.score >= 90
                 ? { label:"🔥 Top Pick",    color:"#ea580c", bg:"rgba(234,88,12,0.08)",  border:"rgba(234,88,12,0.25)",  reason:"High demand, clear audience, and strong sales potential. A great place to start." }
                 : idea.score >= 75
@@ -1117,7 +1323,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Decision banner — the key new element */}
+                  {/* Decision banner */}
                   <div style={{ display:"flex", alignItems:"center", gap:"10px", padding:"12px 14px", background: decision.bg, border:`1px solid ${decision.border}`, borderRadius:"14px", marginBottom:"14px" }}>
                     <div style={{ fontWeight:800, fontSize:"13px", color: decision.color, whiteSpace:"nowrap" }}>{decision.label}</div>
                     <div style={{ width:"1px", height:"14px", background: decision.border, flexShrink:0 }} />
@@ -1139,8 +1345,8 @@ export default function Home() {
                         if (userEmail) {
                           generatePlan(idea.name);
                         } else {
-                          setSelectedIdea(idea.name);
-                          openSignup("plan");
+                          localStorage.setItem("ember-pending-idea", idea.name);
+                          signIn("google", { callbackUrl: "/" });
                         }
                       }}
                         onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px) scale(1.03)"; e.currentTarget.style.boxShadow = "0 10px 22px rgba(234,88,12,0.28)"; }}

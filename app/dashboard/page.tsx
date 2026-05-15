@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 const C = {
   amber:  "#F59E0B",
@@ -13,6 +13,7 @@ const C = {
 const GRAD = `linear-gradient(135deg,#FDE047,#F59E0B,#EA580C,#EF4444,#FB7185)`;
 const GLOW = `0 0 0 1px rgba(245,158,11,0.3), 0 0 24px rgba(234,88,12,0.12), 0 4px 16px rgba(0,0,0,0.3)`;
 const GLOW_STRONG = `0 0 0 1px rgba(245,158,11,0.5), 0 0 40px rgba(234,88,12,0.2), 0 8px 24px rgba(0,0,0,0.4)`;
+const GLOW_DRAG = `0 0 0 2px #F59E0B, 0 0 40px rgba(234,88,12,0.35), 0 20px 40px rgba(0,0,0,0.4)`;
 
 // ── Dashboard data per product ──────────────────────────────────
 type DashData = {
@@ -126,19 +127,47 @@ function getDefaultData(product: string): DashData {
 }
 
 // ── Components ──────────────────────────────────────────────────
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+function Card({ children, style, id, onDragStart, onDragOver, onDrop, isDragging, isOver }: {
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+  id?: string;
+  onDragStart?: () => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDrop?: () => void;
+  isDragging?: boolean;
+  isOver?: boolean;
+}) {
   return (
-    <div style={{
-      background: "var(--card-bg)",
-      borderRadius: "16px",
-      padding: "24px",
-      boxShadow: GLOW,
-      border: "1px solid rgba(245,158,11,0.15)",
-      transition: "box-shadow 0.3s ease",
-      ...style,
-    }}
-      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = GLOW_STRONG; }}
-      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = GLOW; }}>
+    <div
+      draggable={!!id}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={() => {}}
+      style={{
+        background: "var(--card-bg)",
+        borderRadius: "16px",
+        padding: "24px",
+        boxShadow: isDragging ? GLOW_DRAG : isOver ? GLOW_STRONG : GLOW,
+        border: isOver ? "1px solid rgba(245,158,11,0.5)" : "1px solid rgba(245,158,11,0.15)",
+        transition: "box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease",
+        opacity: isDragging ? 0.4 : 1,
+        transform: isOver ? "scale(1.01)" : "scale(1)",
+        cursor: id ? "grab" : "default",
+        position: "relative" as const,
+        ...style,
+      }}
+      onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.boxShadow = GLOW_STRONG; }}
+      onMouseLeave={(e) => { if (!isDragging) e.currentTarget.style.boxShadow = GLOW; }}>
+      {id && (
+        <div style={{
+          position: "absolute" as const, top: "14px", right: "14px",
+          color: "var(--sub)", fontSize: "14px", opacity: 0.4,
+          cursor: "grab", userSelect: "none" as const,
+        }}>
+          ⠿
+        </div>
+      )}
       {children}
     </div>
   );
@@ -194,6 +223,9 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [dash, setDash] = useState<DashData | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [cardOrder, setCardOrder] = useState(["market","competitors","actions","shopify","coming"]);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("ember-final");
@@ -205,12 +237,41 @@ export default function DashboardPage() {
         setDash(d);
       } catch {}
     } else {
-      // Demo mode
       setData({ product: "Resistance Bands", brand: "FlexBands", industry: "Fitness", tagline: "Home fitness made simple" });
       setDash(DASHBOARD_DATA["Resistance Bands"]);
     }
+    // Load saved card order
+    const savedOrder = localStorage.getItem("ember-card-order");
+    if (savedOrder) { try { setCardOrder(JSON.parse(savedOrder)); } catch {} }
     setTimeout(() => setLoaded(true), 100);
   }, []);
+
+  function handleDragStart(id: string) {
+    setDragging(id);
+  }
+
+  function handleDragOver(e: React.DragEvent, id: string) {
+    e.preventDefault();
+    if (id !== dragging) setDragOver(id);
+  }
+
+  function handleDrop(targetId: string) {
+    if (!dragging || dragging === targetId) { setDragging(null); setDragOver(null); return; }
+    const newOrder = [...cardOrder];
+    const fromIdx = newOrder.indexOf(dragging);
+    const toIdx = newOrder.indexOf(targetId);
+    newOrder.splice(fromIdx, 1);
+    newOrder.splice(toIdx, 0, dragging);
+    setCardOrder(newOrder);
+    localStorage.setItem("ember-card-order", JSON.stringify(newOrder));
+    setDragging(null);
+    setDragOver(null);
+  }
+
+  function handleDragEnd() {
+    setDragging(null);
+    setDragOver(null);
+  }
 
   const launchDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
@@ -319,138 +380,194 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Market pulse */}
-        <div className="card-anim" style={{ animationDelay: "0.15s", marginBottom: "24px" }}>
-          <Card>
-            <Label>📈 Market pulse</Label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-              <div>
-                <TrendBar value={dash.trendScore} label="Overall demand score" />
-                <TrendBar value={Math.min(dash.trendScore + 8, 100)} label="Social media momentum" />
-                <TrendBar value={Math.max(dash.trendScore - 10, 50)} label="Search volume trend" />
-                <TrendBar value={Math.min(dash.trendScore + 4, 100)} label="Market growth rate" />
-              </div>
-              <div>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: C.amber, marginBottom: "10px" }}>Demand status</div>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderRadius: "999px", background: "rgba(234,88,12,0.1)", border: "1px solid rgba(234,88,12,0.25)", marginBottom: "16px" }}>
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: C.orange, boxShadow: `0 0 8px ${C.orange}`, animation: "pulse 1.5s ease-in-out infinite" }} />
-                  <span style={{ fontSize: "13px", fontWeight: 700, color: C.orange }}>{dash.demand}</span>
-                </div>
-                <div style={{ fontSize: "13px", color: "var(--sub)", lineHeight: 1.7, marginBottom: "12px" }}>
-                  {dash.season}
-                </div>
-                <div style={{ fontSize: "13px", color: "var(--sub)", lineHeight: 1.7, padding: "12px", background: "rgba(245,158,11,0.05)", borderRadius: "10px", border: "1px solid rgba(245,158,11,0.1)" }}>
-                  💡 {dash.insight}
-                </div>
-              </div>
-            </div>
-          </Card>
+        {/* Drag hint */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", opacity: 0.5 }}>
+          <span style={{ fontSize: "12px" }}>⠿</span>
+          <span style={{ fontSize: "11px", color: "var(--sub)" }}>Drag cards to personalise your dashboard</span>
         </div>
 
-        {/* Competitor analysis */}
-        <div className="card-anim" style={{ animationDelay: "0.2s", marginBottom: "24px" }}>
-          <Card>
-            <Label>🔍 Competitor analysis</Label>
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              {dash.competitors.map((comp, i) => (
-                <div key={i} style={{
-                  padding: "18px", borderRadius: "12px",
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" as const, gap: "8px" }}>
-                    <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text)" }}>{comp.name}</div>
-                    <div style={{ fontSize: "12px", fontWeight: 600, color: C.amber, padding: "3px 10px", borderRadius: "999px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }}>
-                      {comp.price}
-                    </div>
+        {/* Draggable cards in order */}
+        {cardOrder.map((cardId, i) => {
+          const delay = `${0.15 + i * 0.05}s`;
+          const dragProps = {
+            id: cardId,
+            isDragging: dragging === cardId,
+            isOver: dragOver === cardId,
+            onDragStart: () => handleDragStart(cardId),
+            onDragOver: (e: React.DragEvent) => handleDragOver(e, cardId),
+            onDrop: () => handleDrop(cardId),
+          };
+
+          if (cardId === "market") return (
+            <div key="market" className="card-anim" style={{ animationDelay: delay, marginBottom: "24px" }}
+              onDragEnd={handleDragEnd}>
+              <Card {...dragProps}>
+                <Label>📈 Market pulse</Label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+                  <div>
+                    <TrendBar value={dash!.trendScore} label="Overall demand score" />
+                    <TrendBar value={Math.min(dash!.trendScore + 8, 100)} label="Social media momentum" />
+                    <TrendBar value={Math.max(dash!.trendScore - 10, 50)} label="Search volume trend" />
+                    <TrendBar value={Math.min(dash!.trendScore + 4, 100)} label="Market growth rate" />
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
-                    <div>
-                      <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "rgba(34,197,94,0.7)", marginBottom: "5px" }}>✓ Strength</div>
-                      <div style={{ fontSize: "12px", color: "var(--sub)", lineHeight: 1.6 }}>{comp.strength}</div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: C.amber, marginBottom: "10px" }}>Demand status</div>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderRadius: "999px", background: "rgba(234,88,12,0.1)", border: "1px solid rgba(234,88,12,0.25)", marginBottom: "16px" }}>
+                      <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: C.orange, boxShadow: `0 0 8px ${C.orange}`, animation: "pulse 1.5s ease-in-out infinite" }} />
+                      <span style={{ fontSize: "13px", fontWeight: 700, color: C.orange }}>{dash!.demand}</span>
                     </div>
-                    <div>
-                      <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "rgba(239,68,68,0.7)", marginBottom: "5px" }}>✗ Weakness</div>
-                      <div style={{ fontSize: "12px", color: "var(--sub)", lineHeight: 1.6 }}>{comp.weakness}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.amber, marginBottom: "5px" }}>⚡ Your gap</div>
-                      <div style={{ fontSize: "12px", color: "var(--sub)", lineHeight: 1.6 }}>{comp.gap}</div>
+                    <div style={{ fontSize: "13px", color: "var(--sub)", lineHeight: 1.7, marginBottom: "12px" }}>{dash!.season}</div>
+                    <div style={{ fontSize: "13px", color: "var(--sub)", lineHeight: 1.7, padding: "12px", background: "rgba(245,158,11,0.05)", borderRadius: "10px", border: "1px solid rgba(245,158,11,0.1)" }}>
+                      💡 {dash!.insight}
                     </div>
                   </div>
                 </div>
-              ))}
+              </Card>
             </div>
-          </Card>
-        </div>
+          );
 
-        {/* This week's actions */}
-        <div className="card-anim" style={{ animationDelay: "0.25s", marginBottom: "24px" }}>
-          <Card>
-            <Label>⚡ This week's actions</Label>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {dash.actions.map((a, i) => (
-                <div key={i} style={{
-                  display: "flex", alignItems: "center", gap: "14px",
-                  padding: "14px 16px", borderRadius: "12px",
-                  background: i === 0 ? "rgba(234,88,12,0.06)" : "rgba(255,255,255,0.02)",
-                  border: `1px solid ${i === 0 ? "rgba(234,88,12,0.2)" : "rgba(255,255,255,0.05)"}`,
-                }}>
-                  <div style={{ fontSize: "22px", flexShrink: 0 }}>{a.icon}</div>
-                  <div style={{ flex: 1, fontSize: "13px", color: "var(--text)", lineHeight: 1.6 }}>{a.label}</div>
-                  <div style={{
-                    fontSize: "10px", fontWeight: 700, padding: "3px 10px", borderRadius: "999px", flexShrink: 0,
-                    background: a.impact === "High" ? "rgba(234,88,12,0.12)" : "rgba(255,255,255,0.05)",
-                    border: `1px solid ${a.impact === "High" ? "rgba(234,88,12,0.3)" : "rgba(255,255,255,0.08)"}`,
-                    color: a.impact === "High" ? C.orange : "var(--sub)",
-                  }}>
-                    {a.impact} impact
+          if (cardId === "competitors") return (
+            <div key="competitors" className="card-anim" style={{ animationDelay: delay, marginBottom: "24px" }}
+              onDragEnd={handleDragEnd}>
+              <Card {...dragProps}>
+                <Label>🔍 Competitor analysis</Label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {dash!.competitors.map((comp, i) => (
+                    <div key={i} style={{ padding: "18px", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" as const, gap: "8px" }}>
+                        <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text)" }}>{comp.name}</div>
+                        <div style={{ fontSize: "12px", fontWeight: 600, color: C.amber, padding: "3px 10px", borderRadius: "999px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }}>{comp.price}</div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                        <div>
+                          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "rgba(34,197,94,0.7)", marginBottom: "5px" }}>✓ Strength</div>
+                          <div style={{ fontSize: "12px", color: "var(--sub)", lineHeight: 1.6 }}>{comp.strength}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "rgba(239,68,68,0.7)", marginBottom: "5px" }}>✗ Weakness</div>
+                          <div style={{ fontSize: "12px", color: "var(--sub)", lineHeight: 1.6 }}>{comp.weakness}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.amber, marginBottom: "5px" }}>⚡ Your gap</div>
+                          <div style={{ fontSize: "12px", color: "var(--sub)", lineHeight: 1.6 }}>{comp.gap}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          );
+
+          if (cardId === "actions") return (
+            <div key="actions" className="card-anim" style={{ animationDelay: delay, marginBottom: "24px" }}
+              onDragEnd={handleDragEnd}>
+              <Card {...dragProps}>
+                <Label>⚡ This week's actions</Label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {dash!.actions.map((a, i) => (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "center", gap: "14px",
+                      padding: "14px 16px", borderRadius: "12px",
+                      background: i === 0 ? "rgba(234,88,12,0.06)" : "rgba(255,255,255,0.02)",
+                      border: `1px solid ${i === 0 ? "rgba(234,88,12,0.2)" : "rgba(255,255,255,0.05)"}`,
+                    }}>
+                      <div style={{ fontSize: "22px", flexShrink: 0 }}>{a.icon}</div>
+                      <div style={{ flex: 1, fontSize: "13px", color: "var(--text)", lineHeight: 1.6 }}>{a.label}</div>
+                      <div style={{
+                        fontSize: "10px", fontWeight: 700, padding: "3px 10px", borderRadius: "999px", flexShrink: 0,
+                        background: a.impact === "High" ? "rgba(234,88,12,0.12)" : "rgba(255,255,255,0.05)",
+                        border: `1px solid ${a.impact === "High" ? "rgba(234,88,12,0.3)" : "rgba(255,255,255,0.08)"}`,
+                        color: a.impact === "High" ? C.orange : "var(--sub)",
+                      }}>
+                        {a.impact} impact
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          );
+
+          if (cardId === "shopify") return (
+            <div key="shopify" className="card-anim" style={{ animationDelay: delay, marginBottom: "24px" }}
+              onDragEnd={handleDragEnd}>
+              <Card {...dragProps} style={{ background: "rgba(255,255,255,0.02)", position: "relative" as const, overflow: "hidden" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                  <Label>🛍️ Store performance</Label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "5px 12px", borderRadius: "999px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "rgba(255,255,255,0.2)" }} />
+                    <span style={{ fontSize: "11px", color: "var(--sub)", fontWeight: 600 }}>Not connected</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-
-        {/* Coming soon */}
-        <div className="card-anim" style={{ animationDelay: "0.3s", marginBottom: "24px" }}>
-          <Card style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-            <Label>🚀 Coming to your dashboard</Label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: "12px" }}>
-              {[
-                { icon: "📊", title: "Sales tracking", desc: "Revenue, orders and conversion rate in real time" },
-                { icon: "🤖", title: "AI advisor", desc: "Ask Ember anything about your business" },
-                { icon: "📧", title: "Customer inbox", desc: "AI drafts replies to every customer email" },
-                { icon: "📦", title: "Stock alerts", desc: "Never run out of your best seller again" },
-                { icon: "📣", title: "Ad performance", desc: "ROAS and attribution across TikTok and Meta" },
-                { icon: "📅", title: "Weekly report", desc: "Monday morning business summary to your inbox" },
-              ].map((f, i) => (
-                <div key={i} style={{
-                  padding: "16px", borderRadius: "12px",
-                  background: "rgba(255,255,255,0.02)",
-                  border: "1px solid rgba(255,255,255,0.05)",
-                  opacity: 0.65,
-                }}>
-                  <div style={{ fontSize: "20px", marginBottom: "8px" }}>{f.icon}</div>
-                  <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)", marginBottom: "4px" }}>{f.title}</div>
-                  <div style={{ fontSize: "11px", color: "var(--sub)", lineHeight: 1.6 }}>{f.desc}</div>
+                <div style={{ position: "relative" as const }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "12px", marginBottom: "12px" }}>
+                    {[
+                      { icon: "💰", label: "Total revenue", value: "£2,340", sub: "+18% this week" },
+                      { icon: "📦", label: "Orders placed", value: "67", sub: "Last 30 days" },
+                      { icon: "📈", label: "Conversion rate", value: "3.4%", sub: "Industry avg 2.1%" },
+                      { icon: "🏷️", label: "Avg order value", value: "£34.92", sub: "Per customer" },
+                      { icon: "💵", label: "Gross profit", value: "£1,170", sub: "After product cost" },
+                      { icon: "🔄", label: "Repeat customers", value: "23%", sub: "Returning buyers" },
+                    ].map((m, i) => (
+                      <div key={i} style={{ padding: "16px", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)", filter: "blur(6px)", userSelect: "none" as const, pointerEvents: "none" as const }}>
+                        <div style={{ fontSize: "18px", marginBottom: "6px" }}>{m.icon}</div>
+                        <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "var(--sub)", marginBottom: "6px" }}>{m.label}</div>
+                        <div style={{ fontSize: "22px", fontWeight: 800, color: C.amber, marginBottom: "2px" }}>{m.value}</div>
+                        <div style={{ fontSize: "11px", color: "var(--sub)" }}>{m.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ position: "absolute" as const, inset: 0, display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: "12px", background: "linear-gradient(to bottom, transparent 0%, var(--bg) 60%)" }}>
+                    <div style={{ textAlign: "center" as const, padding: "0 24px", marginTop: "40px" }}>
+                      <div style={{ fontSize: "24px", marginBottom: "10px" }}>🔒</div>
+                      <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--text)", marginBottom: "6px" }}>Connect your Shopify store</div>
+                      <div style={{ fontSize: "13px", color: "var(--sub)", marginBottom: "16px", lineHeight: 1.6 }}>Track real revenue, orders, profit and conversion rate — all in one place</div>
+                      <button onClick={() => { const email = prompt("Enter your email and we'll notify you when Shopify integration launches:"); if (email && email.includes("@")) { alert("You're on the list! We'll email you as soon as Shopify Connect launches 🔥"); } }}
+                        style={{ padding: "12px 28px", borderRadius: "999px", border: "none", background: GRAD, color: "white", fontWeight: 700, fontSize: "14px", cursor: "pointer", boxShadow: "0 6px 20px rgba(234,88,12,0.3)" }}>
+                        Connect Shopify →
+                      </button>
+                      <div style={{ fontSize: "11px", color: "var(--sub)", marginTop: "10px" }}>Coming in Phase 2 · Join waitlist to get early access</div>
+                    </div>
+                  </div>
                 </div>
-              ))}
+              </Card>
             </div>
-            <div style={{ marginTop: "20px", textAlign: "center" as const }}>
-              <div style={{ fontSize: "12px", color: "var(--sub)", marginBottom: "12px" }}>
-                Phase 2 launching soon — be the first to know
-              </div>
-              <button style={{
-                padding: "10px 28px", borderRadius: "999px", border: "none",
-                background: GRAD, color: "white", fontWeight: 700, fontSize: "13px",
-                cursor: "pointer", boxShadow: "0 6px 18px rgba(234,88,12,0.25)",
-              }}>
-                Join the waitlist →
-              </button>
+          );
+
+          if (cardId === "coming") return (
+            <div key="coming" className="card-anim" style={{ animationDelay: delay, marginBottom: "24px" }}
+              onDragEnd={handleDragEnd}>
+              <Card {...dragProps} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <Label>🚀 Coming to your dashboard</Label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: "12px" }}>
+                  {[
+                    { icon: "📊", title: "Sales tracking", desc: "Revenue, orders and conversion rate in real time" },
+                    { icon: "🤖", title: "AI advisor", desc: "Ask Ember anything about your business" },
+                    { icon: "📧", title: "Customer inbox", desc: "AI drafts replies to every customer email" },
+                    { icon: "📦", title: "Stock alerts", desc: "Never run out of your best seller again" },
+                    { icon: "📣", title: "Ad performance", desc: "ROAS and attribution across TikTok and Meta" },
+                    { icon: "📅", title: "Weekly report", desc: "Monday morning business summary to your inbox" },
+                  ].map((f, i) => (
+                    <div key={i} style={{ padding: "16px", borderRadius: "12px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", opacity: 0.65 }}>
+                      <div style={{ fontSize: "20px", marginBottom: "8px" }}>{f.icon}</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)", marginBottom: "4px" }}>{f.title}</div>
+                      <div style={{ fontSize: "11px", color: "var(--sub)", lineHeight: 1.6 }}>{f.desc}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: "20px", textAlign: "center" as const }}>
+                  <div style={{ fontSize: "12px", color: "var(--sub)", marginBottom: "12px" }}>Phase 2 launching soon — be the first to know</div>
+                  <button style={{ padding: "10px 28px", borderRadius: "999px", border: "none", background: GRAD, color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer", boxShadow: "0 6px 18px rgba(234,88,12,0.25)" }}>
+                    Join the waitlist →
+                  </button>
+                </div>
+              </Card>
             </div>
-          </Card>
-        </div>
+          );
+
+          return null;
+        })}
 
       </div>
     </div>

@@ -352,7 +352,7 @@ export default function FinalPage() {
 
           {/* Dashboard — primary CTA */}
           <button
-            onClick={() => window.location.href = "/dashboard"}
+            onClick={() => window.open("/dashboard", "_blank")}
             style={{ width:"100%", maxWidth:"360px", padding:"14px 28px", borderRadius:"14px", border:"none",
               background:`linear-gradient(135deg,${COLOURS.yellow},${COLOURS.amber},${COLOURS.orange},${COLOURS.red},${COLOURS.pink})`,
               color:"white", fontWeight:800, fontSize:"15px", cursor:"pointer",
