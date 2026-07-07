@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { getSupplierMatches } from "@/app/lib/supplier-match";
 
 // ── Colours ──────────────────────────────────────────────────────
 const C = {
@@ -162,13 +163,9 @@ export default function DashboardPage() {
   const [isPro, setIsPro] = useState(false);
   const [checkingPro, setCheckingPro] = useState(true);
   const [storeData, setStoreData] = useState<any>(null);
-  const [allStores, setAllStores] = useState<any[]>([]);
-  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [orders, setOrders] = useState<any[]>([]);
-  const [orderActionLoading, setOrderActionLoading] = useState<string | null>(null);
   const [storeLoading, setStoreLoading] = useState(true);
   const [connectLoading, setConnectLoading] = useState(false);
-  const [connectError, setConnectError] = useState("");
   const [publishLoading, setPublishLoading] = useState(false);
   const [subdomainInput, setSubdomainInput] = useState("");
   const [subdomainError, setSubdomainError] = useState("");
@@ -216,40 +213,11 @@ export default function DashboardPage() {
       const res = await fetch(`/api/store/mine?email=${encodeURIComponent(email)}`);
       if (res.ok) {
         const d = await res.json();
-        const stores: any[] = d.stores || (d.store ? [d.store] : []);
-        setAllStores(stores);
-        const active = stores[0] || null;
-        setStoreData(active);
-        if (active?.subdomain) setSubdomainInput(active.subdomain);
-        if (active?.id) setSelectedStoreId(active.id);
+        setStoreData(d.store || null);
+        if (d.store?.subdomain) setSubdomainInput(d.store.subdomain);
       }
     } catch (e) { console.error(e); }
     setStoreLoading(false);
-  }
-
-  function selectStore(store: any) {
-    setStoreData(store);
-    setSelectedStoreId(store.id);
-    setSubdomainInput(store.subdomain || "");
-    setSubdomainError("");
-    setConnectError("");
-  }
-
-  async function updateOrderStatus(orderId: string, status: "dispatched" | "delivered") {
-    const email = session?.user?.email || localStorage.getItem("ember-email");
-    if (!email) return;
-    setOrderActionLoading(orderId + status);
-    try {
-      const res = await fetch("/api/orders/update-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: orderId, status, seller_email: email }),
-      });
-      if (res.ok) {
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-      }
-    } catch (e) { console.error(e); }
-    setOrderActionLoading(null);
   }
 
   async function loadOrders() {
@@ -272,11 +240,10 @@ export default function DashboardPage() {
     setPublishLoading(true);
     setSubdomainError("");
     try {
-      const email = session?.user?.email || localStorage.getItem("ember-email");
       const res = await fetch("/api/store/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, subdomain: clean, store_html: storeData?.store_html || null, store_id: storeData?.id || null }),
+        body: JSON.stringify({ email: session?.user?.email, subdomain: clean }),
       });
       const d = await res.json();
       if (!res.ok) { setSubdomainError(d.error || "Failed to publish"); setPublishLoading(false); return; }
@@ -287,26 +254,17 @@ export default function DashboardPage() {
   }
 
   async function connectStripe() {
-    const email = session?.user?.email || localStorage.getItem("ember-email");
-    if (!email) { setConnectError("Sign in to connect Stripe."); return; }
-    if (!storeData?.id) { setConnectError("Build and publish your store first."); return; }
+    if (!storeData?.id) return;
     setConnectLoading(true);
-    setConnectError("");
     try {
       const res = await fetch("/api/stripe/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, storeId: storeData.id }),
+        body: JSON.stringify({ email: session?.user?.email, storeId: storeData.id }),
       });
       const d = await res.json();
-      if (d.url) {
-        window.location.href = d.url;
-      } else {
-        setConnectError(d.error || "Something went wrong. Please try again.");
-      }
-    } catch (e) {
-      setConnectError("Connection failed. Please try again.");
-    }
+      if (d.url) window.location.href = d.url;
+    } catch (e) { console.error(e); }
     setConnectLoading(false);
   }
 
@@ -558,64 +516,8 @@ export default function DashboardPage() {
 
       return (
         <div>
-          <h2 style={{ fontSize:"22px", fontWeight:800, color:"#111827", marginBottom:"4px" }}>My Brands</h2>
-          <p style={{ fontSize:"14px", color:C.muted, marginBottom:"20px" }}>Select a brand to manage it</p>
-
-          {/* Brand switcher — all stores */}
-          {allStores.length > 0 && (
-            <div style={{ display:"flex", flexDirection:"column" as const, gap:"10px", marginBottom:"28px" }}>
-              {allStores.map((s: any) => {
-                const isActive = s.id === storeData?.id;
-                const isLive = s.published && s.subdomain;
-                return (
-                  <div key={s.id} onClick={() => selectStore(s)}
-                    style={{ background:C.white, border:`2px solid ${isActive ? C.orange : C.border}`,
-                      borderRadius:"16px", padding:"16px 20px", cursor:"pointer",
-                      display:"flex", alignItems:"center", gap:"16px",
-                      boxShadow: isActive ? "0 0 0 3px rgba(234,88,12,0.08)" : "none",
-                      transition:"all 0.15s" }}>
-                    <div style={{ width:"44px", height:"44px", borderRadius:"12px", flexShrink:0,
-                      background: isActive ? "rgba(234,88,12,0.1)" : C.light,
-                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:"20px" }}>
-                      {s.is_digital ? "💻" : "🛍️"}
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:"14px", fontWeight:700, color:"#111827", marginBottom:"2px",
-                        overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>
-                        {s.product_name || s.brand || "Unnamed store"}
-                      </div>
-                      <div style={{ fontSize:"12px", color: isLive ? C.green : C.muted, fontWeight:600 }}>
-                        {isLive ? `${s.subdomain}.useember.io` : "Not published yet"}
-                      </div>
-                    </div>
-                    <div style={{ display:"flex", flexDirection:"column" as const, alignItems:"flex-end", gap:"4px", flexShrink:0 }}>
-                      <div style={{ fontSize:"11px", fontWeight:700, padding:"3px 8px", borderRadius:"999px",
-                        background: isLive ? "rgba(22,163,74,0.1)" : "rgba(234,88,12,0.08)",
-                        color: isLive ? C.green : C.orange,
-                        border: isLive ? "1px solid rgba(22,163,74,0.25)" : "1px solid rgba(234,88,12,0.2)" }}>
-                        {isLive ? "✓ Live" : "Draft"}
-                      </div>
-                      {s.stripe_onboarded && (
-                        <div style={{ fontSize:"10px", color:C.green, fontWeight:600 }}>💳 Payments on</div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              <button onClick={() => window.location.href = "/"}
-                style={{ padding:"12px", borderRadius:"12px", border:`1.5px dashed ${C.border}`,
-                  background:"transparent", color:C.muted, fontWeight:600, fontSize:"13px",
-                  cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"6px" }}>
-                + Build a new brand
-              </button>
-            </div>
-          )}
-
-          {storeData && (
-          <div>
-          <div style={{ fontSize:"13px", fontWeight:700, color:C.orange, letterSpacing:"0.06em", textTransform:"uppercase" as const, marginBottom:"12px" }}>
-            Managing: {storeData.product_name || storeData.brand || "Store"}
-          </div>
+          <h2 style={{ fontSize:"22px", fontWeight:800, color:"#111827", marginBottom:"4px" }}>My Store</h2>
+          <p style={{ fontSize:"14px", color:C.muted, marginBottom:"24px" }}>Publish your store and accept payments</p>
 
           {/* Subdomain section */}
           <div style={{ background:C.white, border: isPublished ? `2px solid ${C.green}` : `2px solid rgba(234,88,12,0.2)`, borderRadius:"20px", padding:"24px", marginBottom:"16px" }}>
@@ -705,21 +607,12 @@ export default function DashboardPage() {
                 ✓ Stripe Connected — ready to accept payments
               </div>
             ) : (
-              <>
-                <button onClick={connectStripe} disabled={connectLoading || !isPublished}
-                  style={{ padding:"12px 24px", borderRadius:"12px", border:"none", background: isPublished ? GRAD : "#D1D5DB", color:"white", fontWeight:700, fontSize:"14px", cursor: isPublished ? "pointer" : "not-allowed", opacity: connectLoading ? 0.6 : 1 }}>
-                  {connectLoading ? "Connecting..." : isPublished ? "Connect Stripe →" : "Publish your store first"}
-                </button>
-                {connectError && (
-                  <div style={{ marginTop:"10px", fontSize:"13px", color:C.red, fontWeight:500 }}>
-                    {connectError}
-                  </div>
-                )}
-              </>
+              <button onClick={connectStripe} disabled={connectLoading || !isPublished}
+                style={{ padding:"12px 24px", borderRadius:"12px", border:"none", background: isPublished ? GRAD : "#D1D5DB", color:"white", fontWeight:700, fontSize:"14px", cursor: isPublished ? "pointer" : "not-allowed", opacity: connectLoading ? 0.6 : 1 }}>
+                {connectLoading ? "Connecting..." : isPublished ? "Connect Stripe →" : "Publish your store first"}
+              </button>
             )}
           </div>
-          </div>
-          )}
         </div>
       );
     }
@@ -789,23 +682,129 @@ export default function DashboardPage() {
     );
 
     // ── SUPPLIERS ─────────────────────────────────────────────
-    if (activeNav === "suppliers") return (
-      <div>
-        <h2 style={{ fontSize:"22px", fontWeight:800, color:"#111827", marginBottom:"4px" }}>Suppliers</h2>
-        <p style={{ fontSize:"14px", color:C.muted, marginBottom:"24px" }}>Recommended suppliers for {data?.product}</p>
-        <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:"20px", padding:"24px" }}>
-          <p style={{ fontSize:"14px", color:"#374151", lineHeight:1.7 }}>
-            Complete the full Ember flow to get your supplier contacts for {data?.product || "your product"}.
-            Supplier details are included in your sales playbook.
+    // ── SUPPLIERS (matchmaker) ────────────────────────────────
+    if (activeNav === "suppliers") {
+      const productName = storeData?.product_name || data?.product || "";
+      const isDigital = storeData?.is_digital || false;
+      const matches = getSupplierMatches(productName, isDigital);
+
+      if (isDigital) {
+        return (
+          <div>
+            <h2 style={{ fontSize:"22px", fontWeight:800, color:"#111827", marginBottom:"4px" }}>Suppliers</h2>
+            <p style={{ fontSize:"14px", color:C.muted, marginBottom:"24px" }}>Fulfilment for your product</p>
+            <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:"20px", padding:"32px", textAlign:"center" }}>
+              <div style={{ fontSize:"36px", marginBottom:"12px" }}>💾</div>
+              <div style={{ fontSize:"16px", fontWeight:700, color:"#111827", marginBottom:"8px" }}>No supplier needed</div>
+              <div style={{ fontSize:"13px", color:C.muted, lineHeight:1.6, maxWidth:"420px", margin:"0 auto" }}>
+                This is a digital product — there's nothing to source or ship. Your files are delivered automatically to customers after purchase. Just focus on marketing and sales.
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div>
+          <h2 style={{ fontSize:"22px", fontWeight:800, color:"#111827", marginBottom:"4px" }}>Suppliers</h2>
+          <p style={{ fontSize:"14px", color:C.muted, marginBottom:"20px" }}>
+            {productName ? `Connect a supplier to fulfil orders for ${productName}` : "Connect a supplier to fulfil your orders"}
           </p>
-          <button onClick={() => window.location.href = "/"}
-            style={{ marginTop:"16px", padding:"12px 24px", borderRadius:"12px", border:"none",
-              background:GRAD, color:"white", fontWeight:700, fontSize:"14px", cursor:"pointer" }}>
-            Rebuild to get suppliers →
-          </button>
+
+          {/* How it works strip */}
+          <div style={{ background:"rgba(234,88,12,0.04)", border:"1px solid rgba(234,88,12,0.15)", borderRadius:"16px", padding:"16px 18px", marginBottom:"20px", display:"flex", gap:"12px", alignItems:"flex-start" }}>
+            <div style={{ fontSize:"20px", flexShrink:0 }}>💡</div>
+            <div style={{ fontSize:"13px", color:"#374151", lineHeight:1.6 }}>
+              <strong>How this works:</strong> Ember matches you to the best supplier for your product. You connect them to your store using their free tool, and they ship orders directly to your customers — you never hold stock. Start with the recommended option to test with zero risk.
+            </div>
+          </div>
+
+          {/* Supplier cards */}
+          <div style={{ display:"flex", flexDirection:"column" as const, gap:"14px" }}>
+            {matches.map((s, i) => (
+              <div key={i} style={{
+                background:C.white,
+                border: s.recommended ? `2px solid ${C.orange}` : `1px solid ${C.border}`,
+                borderRadius:"20px", padding:"22px", position:"relative" as const,
+              }}>
+                {s.recommended && (
+                  <div style={{ position:"absolute" as const, top:"-11px", left:"22px", background:C.orange, color:"white", fontSize:"10px", fontWeight:800, padding:"4px 12px", borderRadius:"999px", letterSpacing:"0.06em" }}>
+                    ⭐ START HERE
+                  </div>
+                )}
+
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:"12px", marginBottom:"12px", flexWrap:"wrap" as const }}>
+                  <div style={{ display:"flex", gap:"12px", alignItems:"center" }}>
+                    <div style={{ fontSize:"32px" }}>{s.logo}</div>
+                    <div>
+                      <div style={{ fontSize:"17px", fontWeight:800, color:"#111827" }}>{s.name}</div>
+                      <div style={{ fontSize:"13px", color:C.orange, fontWeight:600 }}>{s.tagline}</div>
+                    </div>
+                  </div>
+                  <a href={s.connectUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ padding:"10px 20px", borderRadius:"12px", border:"none",
+                      background: s.recommended ? GRAD : "#111827", color:"white",
+                      fontWeight:700, fontSize:"13px", cursor:"pointer", textDecoration:"none",
+                      whiteSpace:"nowrap" as const, flexShrink:0 }}>
+                    Connect {s.name.split(" ")[0]} →
+                  </a>
+                </div>
+
+                <div style={{ fontSize:"13px", color:"#6b7280", lineHeight:1.6, marginBottom:"16px" }}>
+                  <strong style={{ color:"#374151" }}>Best for:</strong> {s.bestFor}
+                </div>
+
+                {/* Pros / cons */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"16px" }} className="supplier-proscons">
+                  <div style={{ background:"rgba(22,163,74,0.04)", border:"1px solid rgba(22,163,74,0.12)", borderRadius:"12px", padding:"12px 14px" }}>
+                    <div style={{ fontSize:"10px", fontWeight:700, color:C.green, letterSpacing:"0.06em", textTransform:"uppercase" as const, marginBottom:"8px" }}>Pros</div>
+                    {s.proCons.pros.map((pro, j) => (
+                      <div key={j} style={{ fontSize:"12px", color:"#374151", lineHeight:1.5, marginBottom:"5px", display:"flex", gap:"6px" }}>
+                        <span style={{ color:C.green, flexShrink:0 }}>✓</span> {pro}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ background:"rgba(0,0,0,0.02)", border:`1px solid ${C.border}`, borderRadius:"12px", padding:"12px 14px" }}>
+                    <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, letterSpacing:"0.06em", textTransform:"uppercase" as const, marginBottom:"8px" }}>Trade-offs</div>
+                    {s.proCons.cons.map((con, j) => (
+                      <div key={j} style={{ fontSize:"12px", color:"#6b7280", lineHeight:1.5, marginBottom:"5px", display:"flex", gap:"6px" }}>
+                        <span style={{ color:C.muted, flexShrink:0 }}>•</span> {con}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* How fulfilment works */}
+                <div style={{ background:C.light, borderRadius:"12px", padding:"12px 14px", marginBottom:"16px" }}>
+                  <div style={{ fontSize:"10px", fontWeight:700, color:"#374151", letterSpacing:"0.06em", textTransform:"uppercase" as const, marginBottom:"6px" }}>How fulfilment works</div>
+                  <div style={{ fontSize:"12px", color:"#6b7280", lineHeight:1.6 }}>{s.fulfilment}</div>
+                </div>
+
+                {/* Setup steps */}
+                <details style={{ cursor:"pointer" }}>
+                  <summary style={{ fontSize:"13px", fontWeight:700, color:C.orange, listStyle:"none", userSelect:"none" as const }}>
+                    Show setup steps ↓
+                  </summary>
+                  <div style={{ marginTop:"12px", display:"flex", flexDirection:"column" as const, gap:"8px" }}>
+                    {s.setupSteps.map((step, j) => (
+                      <div key={j} style={{ display:"flex", gap:"10px", alignItems:"flex-start" }}>
+                        <div style={{ width:"20px", height:"20px", borderRadius:"50%", background:"rgba(234,88,12,0.1)", color:C.orange, fontSize:"11px", fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:"1px" }}>{j+1}</div>
+                        <div style={{ fontSize:"13px", color:"#374151", lineHeight:1.6 }}>{step}</div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer note */}
+          <div style={{ marginTop:"16px", padding:"14px 18px", background:C.light, borderRadius:"14px", fontSize:"12px", color:C.muted, lineHeight:1.6 }}>
+            💡 Always order a sample before selling — check quality, shipping time and packaging yourself first. Ember matches you to suppliers but doesn't handle fulfilment directly.
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
 
     // ── PLAYBOOK ──────────────────────────────────────────────
     if (activeNav === "playbook") return (
@@ -866,55 +865,16 @@ export default function DashboardPage() {
               </button>
             </div>
           ) : (
-            <div style={{ display:"flex", flexDirection:"column" as const, gap:"10px" }}>
-              {orders.map((order: any) => {
-                const isPaid = order.status === "paid" || order.status === "completed";
-                const isDispatched = order.status === "dispatched";
-                const isDelivered = order.status === "delivered";
-                const statusColor = isDelivered ? C.green : isDispatched ? "#7C3AED" : C.orange;
-                const statusLabel = isDelivered ? "✓ Delivered" : isDispatched ? "🚀 Dispatched" : "📦 Paid";
-                const dispatchKey = order.id + "dispatched";
-                const deliverKey = order.id + "delivered";
-                return (
-                  <div key={order.id} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:"16px", padding:"16px 20px" }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:"12px", flexWrap:"wrap" as const, marginBottom:"12px" }}>
-                      <div>
-                        <div style={{ fontSize:"14px", fontWeight:700, color:"#111827", marginBottom:"3px" }}>{order.product_name || "Order"}</div>
-                        <div style={{ fontSize:"12px", color:C.muted }}>{order.customer_email || "—"} · {order.shipping_name ? `${order.shipping_name} · ` : ""}{new Date(order.created_at).toLocaleDateString("en-GB")}</div>
-                      </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:"10px", flexShrink:0 }}>
-                        <div style={{ fontSize:"11px", fontWeight:700, padding:"3px 10px", borderRadius:"999px",
-                          background: isDelivered ? "rgba(22,163,74,0.08)" : isDispatched ? "rgba(124,58,237,0.08)" : "rgba(234,88,12,0.08)",
-                          border: `1px solid ${isDelivered ? "rgba(22,163,74,0.2)" : isDispatched ? "rgba(124,58,237,0.2)" : "rgba(234,88,12,0.2)"}`,
-                          color: statusColor }}>
-                          {statusLabel}
-                        </div>
-                        <div style={{ fontSize:"18px", fontWeight:800, color:C.green }}>£{((order.amount_pence || 0) / 100).toFixed(2)}</div>
-                      </div>
-                    </div>
-                    {!isDelivered && (
-                      <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" as const }}>
-                        {isPaid && (
-                          <button
-                            disabled={orderActionLoading === dispatchKey}
-                            onClick={() => updateOrderStatus(order.id, "dispatched")}
-                            style={{ padding:"8px 16px", borderRadius:"8px", border:"none", background:"#7C3AED", color:"white", fontWeight:700, fontSize:"12px", cursor:"pointer", opacity: orderActionLoading === dispatchKey ? 0.6 : 1 }}>
-                            {orderActionLoading === dispatchKey ? "Sending…" : "Mark dispatched →"}
-                          </button>
-                        )}
-                        {isDispatched && (
-                          <button
-                            disabled={orderActionLoading === deliverKey}
-                            onClick={() => updateOrderStatus(order.id, "delivered")}
-                            style={{ padding:"8px 16px", borderRadius:"8px", border:"none", background:C.green, color:"white", fontWeight:700, fontSize:"12px", cursor:"pointer", opacity: orderActionLoading === deliverKey ? 0.6 : 1 }}>
-                            {orderActionLoading === deliverKey ? "Sending…" : "Mark delivered →"}
-                          </button>
-                        )}
-                      </div>
-                    )}
+            <div style={{ display:"flex", flexDirection:"column" as const, gap:"8px" }}>
+              {orders.map((order: any, i: number) => (
+                <div key={i} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:"16px", padding:"16px", display:"flex", justifyContent:"space-between", alignItems:"center", gap:"12px", flexWrap:"wrap" as const }}>
+                  <div>
+                    <div style={{ fontSize:"14px", fontWeight:700, color:"#111827" }}>{order.product_name || "Order"}</div>
+                    <div style={{ fontSize:"12px", color:C.muted }}>{order.customer_email || "No email"} · {new Date(order.created_at).toLocaleDateString("en-GB")}</div>
                   </div>
-                );
-              })}
+                  <div style={{ fontSize:"16px", fontWeight:800, color:C.green }}>£{((order.amount_pence || 0) / 100).toFixed(2)}</div>
+                </div>
+              ))}
             </div>
           )}
         </div>
