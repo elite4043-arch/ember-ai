@@ -41,7 +41,7 @@ const NAV: NavItem[] = [
   { id:"revenue",     label:"Revenue",       icon:"💰", section:"ANALYTICS", phase2:true },
   { id:"orders",      label:"Orders",        icon:"🛒", section:"ANALYTICS" },
   { id:"customers",   label:"Customers",     icon:"👥", section:"ANALYTICS", phase2:true },
-  { id:"traffic",     label:"Traffic",       icon:"📈", section:"ANALYTICS", phase2:true },
+  { id:"traffic",     label:"Traffic",       icon:"📈", section:"ANALYTICS" },
   { id:"advisor",     label:"AI Advisor",    icon:"🤖", section:"TOOLS",     phase2:true },
   { id:"alerts",      label:"Product Alerts",icon:"🔔", section:"TOOLS",     phase2:true },
   { id:"abtests",     label:"A/B Tests",     icon:"⚗️", section:"TOOLS",     phase2:true },
@@ -169,6 +169,7 @@ export default function DashboardPage() {
   const [publishLoading, setPublishLoading] = useState(false);
   const [subdomainInput, setSubdomainInput] = useState("");
   const [subdomainError, setSubdomainError] = useState("");
+  const [analytics, setAnalytics] = useState<any>(null);
 
   const launchDate = new Date().toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" });
 
@@ -204,7 +205,23 @@ export default function DashboardPage() {
     checkPro();
     loadStoreData();
     loadOrders();
+    loadAnalytics();
+    // Poll analytics every 20s so "live now" stays fresh
+    const analyticsTimer = setInterval(loadAnalytics, 20000);
+    return () => clearInterval(analyticsTimer);
   }, [session]);
+
+  async function loadAnalytics() {
+    const email = session?.user?.email || localStorage.getItem("ember-email");
+    if (!email) return;
+    try {
+      const res = await fetch(`/api/analytics?email=${encodeURIComponent(email)}`);
+      if (res.ok) {
+        const d = await res.json();
+        setAnalytics(d.analytics || null);
+      }
+    } catch (e) { console.error(e); }
+  }
 
   async function loadStoreData() {
     const email = session?.user?.email || localStorage.getItem("ember-email");
@@ -881,7 +898,92 @@ export default function DashboardPage() {
       );
     }
 
-    if (["revenue","customers","traffic"].includes(activeNav)) {
+    // ── TRAFFIC (live analytics) ──────────────────────────────
+    if (activeNav === "traffic") {
+      const a = analytics;
+      const hasStore = a?.hasStore;
+      const maxViews = a?.series ? Math.max(...a.series.map((s: any) => s.views), 1) : 1;
+
+      return (
+        <div>
+          <h2 style={{ fontSize:"22px", fontWeight:800, color:"#111827", marginBottom:"4px" }}>Traffic</h2>
+          <p style={{ fontSize:"14px", color:C.muted, marginBottom:"24px" }}>
+            {hasStore ? `Live analytics for ${a.subdomain}.useember.io` : "Publish your store to start tracking traffic"}
+          </p>
+
+          {!hasStore ? (
+            <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:"20px", padding:"40px", textAlign:"center" }}>
+              <div style={{ fontSize:"40px", marginBottom:"12px" }}>📈</div>
+              <div style={{ fontSize:"15px", fontWeight:700, color:"#111827", marginBottom:"6px" }}>No traffic data yet</div>
+              <div style={{ fontSize:"13px", color:C.muted, marginBottom:"20px" }}>Publish your store to a subdomain and traffic will start showing here.</div>
+              <button onClick={() => setActiveNav("store")} style={{ padding:"10px 20px", borderRadius:"10px", border:"none", background:GRAD, color:"white", fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
+                Set up store →
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Stat cards */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:"12px", marginBottom:"20px" }}>
+                {/* Live now */}
+                <div style={{ background:C.white, border: a.liveNow > 0 ? `2px solid ${C.green}` : `1px solid ${C.border}`, borderRadius:"16px", padding:"18px" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"6px", marginBottom:"8px" }}>
+                    <div style={{ width:"8px", height:"8px", borderRadius:"50%", background: a.liveNow > 0 ? C.green : "#D1D5DB", animation: a.liveNow > 0 ? "pulse 1.5s ease-in-out infinite" : "none" }} />
+                    <div style={{ fontSize:"11px", fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase" as const, color:C.muted }}>Live now</div>
+                  </div>
+                  <div style={{ fontSize:"28px", fontWeight:800, color: a.liveNow > 0 ? C.green : "#111827" }}>{a.liveNow}</div>
+                  <div style={{ fontSize:"11px", color:C.muted }}>active in last 60s</div>
+                </div>
+                {/* Views today */}
+                <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:"16px", padding:"18px" }}>
+                  <div style={{ fontSize:"11px", fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase" as const, color:C.muted, marginBottom:"8px" }}>Views today</div>
+                  <div style={{ fontSize:"28px", fontWeight:800, color:"#111827" }}>{a.viewsToday}</div>
+                  <div style={{ fontSize:"11px", color:C.muted }}>since midnight</div>
+                </div>
+                {/* Total views */}
+                <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:"16px", padding:"18px" }}>
+                  <div style={{ fontSize:"11px", fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase" as const, color:C.muted, marginBottom:"8px" }}>Total views</div>
+                  <div style={{ fontSize:"28px", fontWeight:800, color:C.orange }}>{a.totalViews}</div>
+                  <div style={{ fontSize:"11px", color:C.muted }}>all time</div>
+                </div>
+              </div>
+
+              {/* 7-day chart */}
+              <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:"20px", padding:"24px" }}>
+                <div style={{ fontSize:"14px", fontWeight:700, color:"#111827", marginBottom:"20px" }}>Last 7 days</div>
+                <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", gap:"8px", height:"140px" }}>
+                  {a.series.map((s: any, i: number) => (
+                    <div key={i} style={{ flex:1, display:"flex", flexDirection:"column" as const, alignItems:"center", gap:"8px", height:"100%" }}>
+                      <div style={{ flex:1, width:"100%", display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
+                        <div style={{
+                          width:"70%", maxWidth:"36px",
+                          height: `${Math.max((s.views / maxViews) * 100, s.views > 0 ? 6 : 2)}%`,
+                          background: s.views > 0 ? GRAD : "#E5E7EB",
+                          borderRadius:"6px 6px 0 0",
+                          transition:"height 0.4s ease",
+                          position:"relative" as const,
+                        }} title={`${s.views} views`}>
+                          {s.views > 0 && (
+                            <div style={{ position:"absolute" as const, top:"-20px", left:"50%", transform:"translateX(-50%)", fontSize:"11px", fontWeight:700, color:"#374151", whiteSpace:"nowrap" as const }}>{s.views}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ fontSize:"11px", color:C.muted, fontWeight:600 }}>{s.day}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginTop:"16px", padding:"14px 18px", background:C.light, borderRadius:"14px", fontSize:"12px", color:C.muted, lineHeight:1.6 }}>
+                💡 Traffic updates live. Share your store link on TikTok, Reddit and with creators to drive visitors — then watch this fill up.
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+
+    // ── PHASE 2 ANALYTICS (revenue/customers only now) ────────
+    if (["revenue","customers"].includes(activeNav)) {
       const phase2Items: Record<string, {icon:string;title:string;desc:string}> = {
         revenue:   { icon:"💰", title:"Revenue tracking", desc:"See total revenue, daily trends and profit margins from your Ember store in real time" },
         orders:    { icon:"🛒", title:"Order management", desc:"View all incoming orders, manage fulfilment and track delivery status" },
