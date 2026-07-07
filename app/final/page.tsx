@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
+import { generateStoreHTML } from "@/app/lib/generateStoreHTML";
 
 const COLOURS = {
   yellow: "#FDE047",
@@ -66,6 +67,12 @@ export default function FinalPage() {
   const [activeTab, setActiveTab]       = useState<"plan"|"hooks"|"supplier"|"actions">("plan");
   const [copied, setCopied]             = useState("");
   const [scrolled, setScrolled]         = useState(false);
+  const [isPro, setIsPro]               = useState(false);
+  const [showLaunchModal, setShowLaunchModal] = useState(false);
+  const [launchSubdomain, setLaunchSubdomain] = useState("");
+  const [launchError, setLaunchError]   = useState("");
+  const [launchLoading, setLaunchLoading] = useState(false);
+  const [launchedUrl, setLaunchedUrl]   = useState("");
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 40);
@@ -80,8 +87,57 @@ export default function FinalPage() {
 
   useEffect(() => {
     const stored = localStorage.getItem("ember-final");
-    if (stored) { try { setData(JSON.parse(stored)); } catch {} }
+    if (stored) { try { const parsed = JSON.parse(stored); setData(parsed); } catch {} }
+
+    // Check Pro status
+    async function checkPro() {
+      const email =
+        localStorage.getItem("ember-email") ||
+        localStorage.getItem("userEmail") ||
+        (stored ? (() => { try { return JSON.parse(stored).email; } catch { return null; } })() : null);
+      if (!email) return;
+      try {
+        const res = await fetch("/api/check-plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        const d = await res.json();
+        setIsPro(d.isPro || false);
+      } catch {}
+    }
+    checkPro();
   }, []);
+
+  async function launchStore() {
+    if (!launchSubdomain.trim()) { setLaunchError("Enter a store address"); return; }
+    const clean = launchSubdomain.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/^-|-$/g, "");
+    if (clean.length < 3) { setLaunchError("Must be at least 3 characters"); return; }
+    if (["www","api","app","admin","mail"].includes(clean)) { setLaunchError("That address is reserved"); return; }
+
+    setLaunchLoading(true);
+    setLaunchError("");
+    try {
+      const email =
+        localStorage.getItem("ember-email") ||
+        localStorage.getItem("userEmail") ||
+        (data ? data.email : null);
+
+      const store_html = data?.store
+        ? generateStoreHTML(data.store, data.brandColor || "#ea580c", data.product || "")
+        : null;
+
+      const res = await fetch("/api/store/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, subdomain: clean, store_html, product_name: data?.product || "" }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setLaunchError(d.error || "Failed to launch"); setLaunchLoading(false); return; }
+      setLaunchedUrl(`https://${clean}.useember.io`);
+    } catch (e) { setLaunchError("Something went wrong"); }
+    setLaunchLoading(false);
+  }
 
   useEffect(() => {
     [0,1,2,3,4,5].forEach((item, i) => {
@@ -92,11 +148,19 @@ export default function FinalPage() {
     });
   }, []);
 
+  const isDigital = data?.mode === "digital";
   const glowProgress = useMemo(() => 38 - Math.sin(motionTick * 0.06) * 20, [motionTick]);
   const glowScale    = useMemo(() => 1 + Math.sin(motionTick * 0.04) * 0.04, [motionTick]);
   const triProgress  = useMemo(() => 38 - Math.sin(motionTick * 0.038 + 0.8) * 12, [motionTick]);
 
-  const checklistItems = [
+  const checklistItems = isDigital ? [
+    { icon:"🔍", label:"Digital product idea validated" },
+    { icon:"📋", label:"3-month creator plan built" },
+    { icon:"🖥️", label:"Creator landing page ready" },
+    { icon:"📱", label:"TikTok hooks written" },
+    { icon:"🛒", label:"Where to sell identified" },
+    { icon:"🛠️", label:"How to create guide ready" },
+  ] : [
     { icon:"🔍", label:"Product discovered & scored" },
     { icon:"📋", label:"3-month business plan created" },
     { icon:"🏪", label:"Branded store built" },
@@ -105,18 +169,33 @@ export default function FinalPage() {
     { icon:"🎯", label:"Test pack prepared" },
   ];
 
-  const hooks = [
+  const hooks = isDigital ? [
+    `The ${data?.product || "digital product"} that saved me hours every week`,
+    `I made £500 selling this one digital product — here's how`,
+    `POV: you bought my ${data?.product || "digital product"} and this happened`,
+  ] : [
     `I didn't expect ${data?.product || "this product"} to work this well`,
     `Why everyone is suddenly buying ${data?.product || "this"}`,
     `I wish I found this sooner — honest review`,
   ];
 
-  const angles = [
+  const angles = isDigital ? [
+    "Show the product in action — scroll through or walkthrough in 60 seconds",
+    "Outcome first — show what someone's life looks like AFTER buying this",
+  ] : [
     "Before vs after — show the visual transformation in under 10 seconds",
     "Problem/solution — lead with the pain, end with the product",
   ];
 
-  const day17 = [
+  const day17 = isDigital ? [
+    { day:"Day 1", action:"Build your digital product. Solve one problem extremely well. Quality over quantity." },
+    { day:"Day 2", action:"Set up Gumroad or your chosen platform. Write a clear outcome-led description." },
+    { day:"Day 3", action:"Design your cover image in Canva — this is your storefront. Make it count." },
+    { day:"Day 4", action:"Film 3 TikTok videos showing the product in action. Post 1x per day this week." },
+    { day:"Day 5", action:"Share in 3 relevant Reddit communities or Facebook groups. Add value, then mention the product." },
+    { day:"Day 6", action:"List on Etsy if not already — free organic traffic. Optimise your listing title with search terms." },
+    { day:"Day 7", action:"DM your first 10 followers with a launch discount. Ask every buyer for a review." },
+  ] : [
     { day:"Day 1", action:"Order 1-2 samples from your supplier. Set up TikTok and Instagram business accounts." },
     { day:"Day 2", action:"Film 5 short videos — unboxing, demo, problem-solution, lifestyle, and honest review." },
     { day:"Day 3", action:"Set up your store. Paste the Ember HTML into Shopify, Wix, or any website builder." },
@@ -172,7 +251,7 @@ export default function FinalPage() {
           <img src="/favicon.svg" alt="Ember" style={{ width:"32px", height:"32px" }} />
           <span style={{ fontWeight:800, fontSize:"21px", letterSpacing:"-0.03em", color:"#111827" }}>Ember</span>
         </a>
-        <div style={{ fontSize:"14px", fontWeight:700, color:"#9a3412" }}>🎉 Business ready</div>
+        <div style={{ fontSize:"14px", fontWeight:700, color:"#9a3412" }}>{isDigital ? "🎉 Digital product ready" : "🎉 Business ready"}</div>
       </div>
 
       {/* Content */}
@@ -182,17 +261,19 @@ export default function FinalPage() {
         <div style={{ textAlign:"center", marginBottom:"36px" }}>
           <div style={{ fontSize:"clamp(52px,12vw,80px)", marginBottom:"10px", display:"inline-block", animation:"firePulse 1.6s ease-in-out infinite" }}>🔥</div>
           <h1 style={{ fontSize:"clamp(26px,6vw,54px)", fontWeight:800, letterSpacing:"-0.045em", color:"#111827", margin:"0 0 10px", lineHeight:1.0 }}>
-            Your business is ready.
+            {isDigital ? "Your digital product is ready." : "Your business is ready."}
           </h1>
           <p style={{ fontSize:"clamp(14px,2.5vw,17px)", color:"rgba(31,41,55,0.6)", maxWidth:"460px", margin:"0 auto 18px", lineHeight:1.55 }}>
-            In under 5 minutes, Ember built you a complete business — plan, store, and sales playbook.
+            {isDigital
+              ? "In under 5 minutes, Ember built you a complete digital product business — creator plan, landing page and sales playbook."
+              : "In under 5 minutes, Ember built you a complete business — plan, store, and sales playbook."}
           </p>
         </div>
 
         {/* Checklist reveal */}
         <div style={{ background:"rgba(255,255,255,0.82)", border:"1px solid rgba(0,0,0,0.08)", borderRadius:"24px", padding:"clamp(16px,4vw,24px)", backdropFilter:"blur(12px)", boxShadow:"0 24px 70px rgba(0,0,0,0.07)", marginBottom:"16px" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"16px", gap:"8px", flexWrap:"wrap" }}>
-            <div style={{ fontWeight:800, fontSize:"clamp(14px,2.5vw,17px)", color:"#111827" }}>✅ Here's what Ember just built you</div>
+            <div style={{ fontWeight:800, fontSize:"clamp(14px,2.5vw,17px)", color:"#111827" }}>{isDigital ? "✅ Here's your complete digital product package" : "✅ Here's what Ember just built you"}</div>
             <div style={{ fontSize:"12px", color:"#9ca3af", fontWeight:600 }}>{checkedItems.length} / {checklistItems.length}</div>
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:"8px" }}>
@@ -235,7 +316,7 @@ export default function FinalPage() {
                 {data?.tagline || "A premium product ready to launch"}
               </div>
               <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
-                <span style={{ padding:"4px 10px", background:"rgba(255,255,255,0.7)", border:`1px solid ${COLOURS.orange}33`, borderRadius:"999px", fontSize:"11px", fontWeight:700, color:"#9a3412" }}>{data?.idea || "Ecommerce"}</span>
+                <span style={{ padding:"4px 10px", background:"rgba(255,255,255,0.7)", border:`1px solid ${COLOURS.orange}33`, borderRadius:"999px", fontSize:"11px", fontWeight:700, color:"#9a3412" }}>{isDigital ? "Digital Product" : (data?.idea || "Ecommerce")}</span>
                 <span style={{ padding:"4px 10px", background:"rgba(255,255,255,0.7)", border:"1px solid rgba(22,163,74,0.3)", borderRadius:"999px", fontSize:"11px", fontWeight:700, color:"#16a34a" }}>✓ Ready to launch</span>
               </div>
             </div>
@@ -251,7 +332,7 @@ export default function FinalPage() {
           <div style={{ display:"flex", gap:"6px", marginBottom:"18px", overflowX:"auto", paddingBottom:"2px" }}>
             {tabBtn("plan",     "📋 3-Month Plan")}
             {tabBtn("hooks",    "🎣 Hooks")}
-            {tabBtn("supplier", "🏭 Supplier")}
+            {tabBtn("supplier", isDigital ? "🛒 Where to sell" : "🏭 Supplier")}
             {tabBtn("actions",  "📅 Day 1-7")}
           </div>
 
@@ -311,25 +392,59 @@ export default function FinalPage() {
 
           {activeTab === "supplier" && (
             <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
-              <div style={{ padding:"16px", background:"rgba(22,163,74,0.06)", border:"1px solid rgba(22,163,74,0.2)", borderRadius:"16px" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", flexWrap:"wrap" }}>
-                  <div style={{ width:"26px", height:"26px", borderRadius:"8px", background:"linear-gradient(135deg,#16a34a,#059669)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"12px", color:"white", fontWeight:800 }}>1</div>
-                  <div style={{ fontWeight:800, fontSize:"14px", color:"#111827" }}>CJ Dropshipping</div>
-                  <span style={{ padding:"3px 8px", background:"rgba(22,163,74,0.1)", border:"1px solid rgba(22,163,74,0.2)", borderRadius:"999px", fontSize:"10px", fontWeight:700, color:"#16a34a" }}>Start here</span>
-                </div>
-                <div style={{ fontSize:"13px", color:"#374151", lineHeight:1.65 }}>No minimum order. Test your marketing before committing to bulk stock. Integrates directly with Shopify. Once you hit 15+ orders/month, move to direct Alibaba sourcing for better margins.</div>
-              </div>
-              <div style={{ padding:"16px", background:"rgba(249,250,251,0.9)", border:"1px solid rgba(0,0,0,0.06)", borderRadius:"16px" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", flexWrap:"wrap" }}>
-                  <div style={{ width:"26px", height:"26px", borderRadius:"8px", background:`linear-gradient(135deg,${COLOURS.amber},${COLOURS.orange})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"12px", color:"white", fontWeight:800 }}>2</div>
-                  <div style={{ fontWeight:800, fontSize:"14px", color:"#111827" }}>Alibaba Direct</div>
-                  <span style={{ padding:"3px 8px", background:"rgba(245,158,11,0.1)", border:"1px solid rgba(245,158,11,0.2)", borderRadius:"999px", fontSize:"10px", fontWeight:700, color:"#92400e" }}>Scale up</span>
-                </div>
-                <div style={{ fontSize:"13px", color:"#374151", lineHeight:1.65 }}>Once you have proven sales, go direct to factory. MOQ typically 50-200 units. 40-60% cheaper than dropshipping. Always order samples first and use Trade Assurance for payment protection.</div>
-              </div>
-              <div style={{ padding:"12px 14px", background:"rgba(234,88,12,0.05)", border:"1px solid rgba(234,88,12,0.15)", borderRadius:"12px", fontSize:"12px", color:"#9a3412", lineHeight:1.6 }}>
-                💡 <strong>The rule:</strong> Start with CJ to validate. Switch to Alibaba once you have consistent orders. Never bulk order before you have proof of demand.
-              </div>
+              {isDigital ? (
+                <>
+                  <div style={{ padding:"16px", background:"rgba(22,163,74,0.06)", border:"1px solid rgba(22,163,74,0.2)", borderRadius:"16px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", flexWrap:"wrap" }}>
+                      <div style={{ width:"26px", height:"26px", borderRadius:"8px", background:"linear-gradient(135deg,#16a34a,#059669)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"12px", color:"white", fontWeight:800 }}>1</div>
+                      <div style={{ fontWeight:800, fontSize:"14px", color:"#111827" }}>Gumroad</div>
+                      <span style={{ padding:"3px 8px", background:"rgba(22,163,74,0.1)", border:"1px solid rgba(22,163,74,0.2)", borderRadius:"999px", fontSize:"10px", fontWeight:700, color:"#16a34a" }}>Start here</span>
+                    </div>
+                    <div style={{ fontSize:"13px", color:"#374151", lineHeight:1.65 }}>Free to start. Upload your product, set your price, and start selling in minutes. Gumroad handles payment, delivery and VAT automatically. Takes 10% fee — no monthly cost until you're earning.</div>
+                  </div>
+                  <div style={{ padding:"16px", background:"rgba(249,250,251,0.9)", border:"1px solid rgba(0,0,0,0.06)", borderRadius:"16px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", flexWrap:"wrap" }}>
+                      <div style={{ width:"26px", height:"26px", borderRadius:"8px", background:`linear-gradient(135deg,${COLOURS.amber},${COLOURS.orange})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"12px", color:"white", fontWeight:800 }}>2</div>
+                      <div style={{ fontWeight:800, fontSize:"14px", color:"#111827" }}>Etsy</div>
+                      <span style={{ padding:"3px 8px", background:"rgba(245,158,11,0.1)", border:"1px solid rgba(245,158,11,0.2)", borderRadius:"999px", fontSize:"10px", fontWeight:700, color:"#92400e" }}>Free traffic</span>
+                    </div>
+                    <div style={{ fontSize:"13px", color:"#374151", lineHeight:1.65 }}>Millions of buyers actively searching for digital products. List your product here for free organic discovery. Optimise your title with search terms like "Notion template", "Lightroom presets", "digital planner".</div>
+                  </div>
+                  <div style={{ padding:"16px", background:"rgba(249,250,251,0.9)", border:"1px solid rgba(0,0,0,0.06)", borderRadius:"16px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", flexWrap:"wrap" }}>
+                      <div style={{ width:"26px", height:"26px", borderRadius:"8px", background:`linear-gradient(135deg,${COLOURS.orange},${COLOURS.pink})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"12px", color:"white", fontWeight:800 }}>3</div>
+                      <div style={{ fontWeight:800, fontSize:"14px", color:"#111827" }}>Stan Store</div>
+                      <span style={{ padding:"3px 8px", background:"rgba(251,113,133,0.1)", border:"1px solid rgba(251,113,133,0.2)", borderRadius:"999px", fontSize:"10px", fontWeight:700, color:"#be123c" }}>Creator tool</span>
+                    </div>
+                    <div style={{ fontSize:"13px", color:"#374151", lineHeight:1.65 }}>Built for creators. Links directly in your TikTok and Instagram bio. Great for selling digital products to your audience without sending them off-platform. £29/month after trial.</div>
+                  </div>
+                  <div style={{ padding:"12px 14px", background:"rgba(234,88,12,0.05)", border:"1px solid rgba(234,88,12,0.15)", borderRadius:"12px", fontSize:"12px", color:"#9a3412", lineHeight:1.6 }}>
+                    💡 <strong>The rule:</strong> Start on Gumroad to validate. Add Etsy for free organic traffic. Move to Stan Store once you have a social media audience sending you traffic.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ padding:"16px", background:"rgba(22,163,74,0.06)", border:"1px solid rgba(22,163,74,0.2)", borderRadius:"16px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", flexWrap:"wrap" }}>
+                      <div style={{ width:"26px", height:"26px", borderRadius:"8px", background:"linear-gradient(135deg,#16a34a,#059669)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"12px", color:"white", fontWeight:800 }}>1</div>
+                      <div style={{ fontWeight:800, fontSize:"14px", color:"#111827" }}>CJ Dropshipping</div>
+                      <span style={{ padding:"3px 8px", background:"rgba(22,163,74,0.1)", border:"1px solid rgba(22,163,74,0.2)", borderRadius:"999px", fontSize:"10px", fontWeight:700, color:"#16a34a" }}>Start here</span>
+                    </div>
+                    <div style={{ fontSize:"13px", color:"#374151", lineHeight:1.65 }}>No minimum order. Test your marketing before committing to bulk stock. Integrates directly with Shopify. Once you hit 15+ orders/month, move to direct Alibaba sourcing for better margins.</div>
+                  </div>
+                  <div style={{ padding:"16px", background:"rgba(249,250,251,0.9)", border:"1px solid rgba(0,0,0,0.06)", borderRadius:"16px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", flexWrap:"wrap" }}>
+                      <div style={{ width:"26px", height:"26px", borderRadius:"8px", background:`linear-gradient(135deg,${COLOURS.amber},${COLOURS.orange})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"12px", color:"white", fontWeight:800 }}>2</div>
+                      <div style={{ fontWeight:800, fontSize:"14px", color:"#111827" }}>Alibaba Direct</div>
+                      <span style={{ padding:"3px 8px", background:"rgba(245,158,11,0.1)", border:"1px solid rgba(245,158,11,0.2)", borderRadius:"999px", fontSize:"10px", fontWeight:700, color:"#92400e" }}>Scale up</span>
+                    </div>
+                    <div style={{ fontSize:"13px", color:"#374151", lineHeight:1.65 }}>Once you have proven sales, go direct to factory. MOQ typically 50-200 units. 40-60% cheaper than dropshipping. Always order samples first and use Trade Assurance for payment protection.</div>
+                  </div>
+                  <div style={{ padding:"12px 14px", background:"rgba(234,88,12,0.05)", border:"1px solid rgba(234,88,12,0.15)", borderRadius:"12px", fontSize:"12px", color:"#9a3412", lineHeight:1.6 }}>
+                    💡 <strong>The rule:</strong> Start with CJ to validate. Switch to Alibaba once you have consistent orders. Never bulk order before you have proof of demand.
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -350,20 +465,47 @@ export default function FinalPage() {
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"12px" }}>
           <div style={{ fontSize:"13px", color:"#9ca3af", fontWeight:600 }}>What would you like to do next?</div>
 
-          {/* Dashboard — primary CTA */}
-          <button
-            onClick={() => window.open("/dashboard", "_blank")}
-            style={{ width:"100%", maxWidth:"360px", padding:"14px 28px", borderRadius:"14px", border:"none",
-              background:`linear-gradient(135deg,${COLOURS.yellow},${COLOURS.amber},${COLOURS.orange},${COLOURS.red},${COLOURS.pink})`,
-              color:"white", fontWeight:800, fontSize:"15px", cursor:"pointer",
-              boxShadow:"0 8px 28px rgba(234,88,12,0.35)", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px" }}>
-            <span>📊</span> View your dashboard
-          </button>
+          {/* Dashboard — Pro gated CTA */}
+          {isPro ? (
+            <div style={{ width:"100%", maxWidth:"360px", display:"flex", flexDirection:"column" as const, gap:"8px" }}>
+              <button
+                onClick={() => { setLaunchSubdomain((data?.brand || "").toLowerCase().replace(/[^a-z0-9-]/g,"").slice(0,20)); setShowLaunchModal(true); }}
+                style={{ width:"100%", padding:"14px 28px", borderRadius:"14px", border:"none",
+                  background:`linear-gradient(135deg,${COLOURS.yellow},${COLOURS.amber},${COLOURS.orange},${COLOURS.red},${COLOURS.pink})`,
+                  color:"white", fontWeight:800, fontSize:"15px", cursor:"pointer",
+                  boxShadow:"0 8px 28px rgba(234,88,12,0.35)", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px" }}>
+                🚀 Launch your store
+              </button>
+              <button
+                onClick={() => window.location.href = "/dashboard"}
+                style={{ width:"100%", padding:"12px 28px", borderRadius:"14px",
+                  border:"1px solid rgba(0,0,0,0.1)", background:"rgba(255,255,255,0.9)",
+                  color:"#374151", fontWeight:700, fontSize:"14px", cursor:"pointer" }}>
+                View your dashboard →
+              </button>
+            </div>
+          ) : (
+            <div style={{ width:"100%", maxWidth:"360px" }}>
+              <button
+                onClick={() => window.location.href = "/pricing"}
+                style={{ width:"100%", padding:"14px 28px", borderRadius:"14px", border:"none",
+                  background:`linear-gradient(135deg,${COLOURS.yellow},${COLOURS.amber},${COLOURS.orange},${COLOURS.red},${COLOURS.pink})`,
+                  color:"white", fontWeight:800, fontSize:"15px", cursor:"pointer",
+                  boxShadow:"0 8px 28px rgba(234,88,12,0.35)", display:"flex", alignItems:"center",
+                  justifyContent:"center", gap:"8px", marginBottom:"8px" }}>
+                Upgrade to Pro — £29/month →
+              </button>
+              <div style={{ fontSize:"12px", color:"#9ca3af", textAlign:"center" as const, lineHeight:1.5 }}>
+                Unlock your dashboard, host your store on<br/>
+                yourstore.useember.io and track real sales
+              </div>
+            </div>
+          )}
 
           <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", justifyContent:"center" }}>
             <button
               onClick={async () => {
-                const shareData = { title:"I built a business with Ember AI 🔥", text:"I just built a complete ecommerce business in under 5 minutes — plan, store, sales playbook, all done.", url:"https://ember-ai-six.vercel.app" };
+                const shareData = { title:"I built a business with Ember AI 🔥", text:isDigital ? "I just built a complete digital product business in under 5 minutes with Ember AI 🔥 Plan, landing page, sales playbook — all done." : "I just built a complete ecommerce business in under 5 minutes — plan, store, sales playbook, all done.", url:"https://ember-ai-six.vercel.app" };
                 if (navigator.share) { try { await navigator.share(shareData); } catch {} }
                 else { await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`); copyText("Copied!", "share"); }
               }}
@@ -374,7 +516,7 @@ export default function FinalPage() {
             </button>
 
             <button
-              onClick={() => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent("I just built a complete ecommerce business in under 5 minutes with Ember AI 🔥 Plan, store, sales playbook — all done. ember-ai-six.vercel.app")}`, "_blank")}
+              onClick={() => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(isDigital ? "I just built a complete digital product business in under 5 minutes with Ember AI 🔥 useember.io" : "I just built a complete ecommerce business in under 5 minutes with Ember AI 🔥 Plan, store, sales playbook — all done. useember.io")}`, "_blank")}
               style={{ padding:"11px 18px", borderRadius:"13px", border:"none", background:"#000", color:"white", fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
               𝕏 Post on X
             </button>
@@ -387,6 +529,79 @@ export default function FinalPage() {
           </div>
         </div>
       </div>
+
+      {/* Launch store modal */}
+      {showLaunchModal && (
+        <div
+          onClick={() => !launchLoading && !launchedUrl && setShowLaunchModal(false)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", backdropFilter:"blur(4px)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background:"white", borderRadius:"24px", padding:"32px", maxWidth:"420px", width:"100%", boxShadow:"0 24px 60px rgba(0,0,0,0.25)" }}>
+
+            {launchedUrl ? (
+              /* Success state */
+              <div style={{ textAlign:"center" as const }}>
+                <div style={{ fontSize:"48px", marginBottom:"12px" }}>🎉</div>
+                <h2 style={{ fontSize:"24px", fontWeight:800, color:"#111827", marginBottom:"8px", letterSpacing:"-0.02em" }}>You're live!</h2>
+                <p style={{ fontSize:"14px", color:"#6b7280", marginBottom:"20px", lineHeight:1.6 }}>
+                  Your store is now live at
+                </p>
+                <a href={launchedUrl} target="_blank" rel="noopener"
+                  style={{ display:"block", fontSize:"16px", fontWeight:800, color:COLOURS.orange, marginBottom:"24px", textDecoration:"none", wordBreak:"break-all" as const }}>
+                  {launchedUrl.replace("https://","")} ↗
+                </a>
+                <div style={{ background:"rgba(234,88,12,0.05)", border:"1px solid rgba(234,88,12,0.15)", borderRadius:"14px", padding:"16px", marginBottom:"20px", textAlign:"left" as const }}>
+                  <div style={{ fontSize:"13px", fontWeight:700, color:"#111827", marginBottom:"6px" }}>💳 Next: connect payments</div>
+                  <div style={{ fontSize:"12px", color:"#6b7280", lineHeight:1.6 }}>
+                    Your store is live, but you'll need to connect Stripe in your dashboard before you can accept payments from customers.
+                  </div>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column" as const, gap:"8px" }}>
+                  <button onClick={() => window.location.href = "/dashboard"}
+                    style={{ width:"100%", padding:"14px", borderRadius:"12px", border:"none", background:`linear-gradient(135deg,${COLOURS.amber},${COLOURS.orange},${COLOURS.red})`, color:"white", fontWeight:800, fontSize:"15px", cursor:"pointer" }}>
+                    Connect payments in dashboard →
+                  </button>
+                  <a href={launchedUrl} target="_blank" rel="noopener"
+                    style={{ width:"100%", padding:"12px", borderRadius:"12px", border:"1px solid rgba(0,0,0,0.1)", background:"white", color:"#374151", fontWeight:700, fontSize:"14px", cursor:"pointer", textAlign:"center" as const, textDecoration:"none", boxSizing:"border-box" as const }}>
+                    Visit my store
+                  </a>
+                </div>
+              </div>
+            ) : (
+              /* Subdomain picker state */
+              <div>
+                <div style={{ fontSize:"32px", marginBottom:"12px", textAlign:"center" as const }}>🚀</div>
+                <h2 style={{ fontSize:"22px", fontWeight:800, color:"#111827", marginBottom:"8px", letterSpacing:"-0.02em", textAlign:"center" as const }}>Launch your store</h2>
+                <p style={{ fontSize:"14px", color:"#6b7280", marginBottom:"24px", lineHeight:1.6, textAlign:"center" as const }}>
+                  Choose your store address. This is where customers will visit.
+                </p>
+
+                <div style={{ display:"flex", alignItems:"center", border:`2px solid ${launchError ? COLOURS.red : "rgba(234,88,12,0.3)"}`, borderRadius:"12px", padding:"12px 14px", marginBottom:launchError ? "6px" : "20px" }}>
+                  <input
+                    value={launchSubdomain}
+                    onChange={(e) => { setLaunchSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"")); setLaunchError(""); }}
+                    placeholder="yourbrand"
+                    autoFocus
+                    style={{ flex:1, border:"none", outline:"none", fontSize:"16px", fontWeight:700, color:"#111827", background:"transparent", minWidth:0 }}
+                  />
+                  <span style={{ fontSize:"15px", fontWeight:700, color:"#9ca3af", whiteSpace:"nowrap" as const }}>.useember.io</span>
+                </div>
+                {launchError && <div style={{ fontSize:"12px", color:COLOURS.red, marginBottom:"16px" }}>{launchError}</div>}
+
+                <button onClick={launchStore} disabled={launchLoading}
+                  style={{ width:"100%", padding:"14px", borderRadius:"12px", border:"none", background:`linear-gradient(135deg,${COLOURS.amber},${COLOURS.orange},${COLOURS.red})`, color:"white", fontWeight:800, fontSize:"15px", cursor: launchLoading ? "wait" : "pointer", opacity: launchLoading ? 0.7 : 1, marginBottom:"8px" }}>
+                  {launchLoading ? "Launching..." : "Launch now →"}
+                </button>
+                <button onClick={() => setShowLaunchModal(false)} disabled={launchLoading}
+                  style={{ width:"100%", padding:"10px", borderRadius:"12px", border:"none", background:"transparent", color:"#9ca3af", fontWeight:600, fontSize:"13px", cursor:"pointer" }}>
+                  Maybe later
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes firePulse {
