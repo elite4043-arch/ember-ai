@@ -91,9 +91,9 @@ export async function POST(req: NextRequest) {
         if (!storeId) { console.warn("No ember_store_id in metadata"); break; }
 
         const shippingDetails = (session as any).collected_information?.shipping_details
-          ?? session.shipping_details;
+          ?? (session as any).shipping_details;
 
-        const { data: order } = await supabase.from("orders").insert({
+        await supabase.from("orders").insert({
           store_id: storeId,
           subdomain: subdomain || null,
           product_name: productName || null,
