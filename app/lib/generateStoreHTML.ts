@@ -1323,20 +1323,38 @@ export function generateStoreHTML(
 
 <script>
 (function(){
-  // Ember cart — opens cart drawer on buy button click
+  // Ember universal checkout — wires all buy buttons to Stripe
   function getSubdomain(){
     var h = window.location.hostname;
     if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
     return null;
   }
-  function startCheckout(e){
+  async function startCheckout(e){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     var sub = getSubdomain();
-    if(!sub){ alert("This is a preview — checkout works on your live store."); return; }
-    emberOpenCart();
+    if(!sub){ alert("This is a preview. Checkout works on your live store."); return; }
+    var btn = e && e.currentTarget;
+    var original = btn ? btn.innerHTML : "";
+    if(btn){ btn.innerHTML = "Loading..."; btn.style.opacity = "0.7"; btn.style.pointerEvents = "none"; }
+    try{
+      var res = await fetch("https://www.useember.io/api/stripe/checkout", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub })
+      });
+      var data = await res.json();
+      if(data.url){ window.location.href = data.url; }
+      else {
+        alert(data.error || "Checkout is not set up yet. The store owner needs to connect payments.");
+        if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+      }
+    }catch(err){
+      alert("Something went wrong. Please try again.");
+      if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+    }
   }
-  // Attach to all buy button classes across all templates (incl. hero-cta)
-  var selectors = [".hero-cta",".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
+  // Attach to all known buy button classes across all templates
+  var selectors = [".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
   function attach(){
     document.querySelectorAll(selectors.join(",")).forEach(function(el){
       if(el.getAttribute("data-ember-checkout")) return;
@@ -1349,108 +1367,32 @@ export function generateStoreHTML(
   } else { attach(); }
 })();
 </script>
-<style>
-#ember-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;backdrop-filter:blur(3px);}
-#ember-cart{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:400px;background:#fff;z-index:9999;transform:translateX(100%);transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 60px rgba(0,0,0,0.15);}
-#ember-cart.open{transform:translateX(0);}
-.ec-head{padding:20px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.ec-title{font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-close{width:32px;height:32px;border:none;background:rgba(0,0,0,0.06);border-radius:8px;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-body{flex:1;padding:24px;overflow-y:auto;}
-.ec-item{display:flex;gap:16px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #f3f4f6;}
-.ec-icon{width:72px;height:72px;background:#f9fafb;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.ec-name{font-size:14px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:6px;line-height:1.4;}
-.ec-price{font-size:17px;font-weight:800;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px;}
-.ec-qty-label{font-size:14px;color:#6b7280;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-ctrl{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-.ec-qty-btn{width:38px;height:38px;border:none;background:#fff;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-qty-btn:hover{background:#f9fafb;}
-.ec-qty-num{width:38px;text-align:center;font-size:15px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:38px;}
-.ec-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f9fafb;border-radius:12px;}
-.ec-total-label{font-size:14px;font-weight:600;color:#374151;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-total-val{font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-trust{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
-.ec-trust-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-foot{padding:20px 24px;border-top:1px solid #f3f4f6;flex-shrink:0;}
-.ec-checkout-btn{width:100%;padding:16px;border:none;color:#fff;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.01em;transition:opacity 0.15s;}
-.ec-checkout-btn:hover{opacity:0.9;}
-.ec-continue-btn{width:100%;padding:12px;border:none;background:transparent;color:#9ca3af;font-size:13px;cursor:pointer;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-@media(max-width:480px){#ember-cart{max-width:100%;}}
-</style>
-<div id="ember-overlay" onclick="emberCloseCart()"></div>
-<div id="ember-cart">
-  <div class="ec-head">
-    <span class="ec-title">Your bag</span>
-    <button class="ec-close" onclick="emberCloseCart()">&#x2715;</button>
-  </div>
-  <div class="ec-body">
-    <div class="ec-item">
-      <div class="ec-icon">&#x1F6CD;&#xFE0F;</div>
-      <div style="flex:1;min-width:0;">
-        <div class="ec-name">${esc(productName)}</div>
-        <div class="ec-price" style="color:${brandColor}">${esc(store.price)}</div>
-      </div>
-    </div>
-    <div class="ec-qty-row">
-      <span class="ec-qty-label">Quantity</span>
-      <div class="ec-qty-ctrl">
-        <button class="ec-qty-btn" onclick="emberQty(-1)">&#x2212;</button>
-        <span id="ec-qty" class="ec-qty-num">1</span>
-        <button class="ec-qty-btn" onclick="emberQty(1)">&#x2B;</button>
-      </div>
-    </div>
-    <div class="ec-total-row">
-      <span class="ec-total-label">Order total</span>
-      <span id="ec-total" class="ec-total-val">${esc(store.price)}</span>
-    </div>
-    <div class="ec-trust">
-      <div class="ec-trust-item">&#x1F512; Secure checkout powered by Stripe</div>
-      <div class="ec-trust-item">&#x21A9;&#xFE0F; 30-day money-back guarantee</div>
-      <div class="ec-trust-item">&#x26A1; Instant confirmation after purchase</div>
-    </div>
-  </div>
-  <div class="ec-foot">
-    <button id="ec-btn" class="ec-checkout-btn" style="background:${brandColor}" onclick="emberCheckout()">Checkout &#x2192; <span id="ec-btn-price">${esc(store.price)}</span></button>
-    <button class="ec-continue-btn" onclick="emberCloseCart()">Continue shopping</button>
-  </div>
-</div>
 <script>
 (function(){
-  var ecBase=parseFloat("${esc(store.price)}".replace(/[^0-9.]/g,""))*100|0,ecQty=1;
-  function ecFmt(p){return"£"+(p/100).toFixed(2);}
-  window.emberQty=function(d){
-    ecQty=Math.max(1,Math.min(ecQty+d,10));
-    document.getElementById("ec-qty").textContent=ecQty;
-    var t=ecFmt(ecBase*ecQty);
-    document.getElementById("ec-total").textContent=t;
-    document.getElementById("ec-btn-price").textContent=t;
-  };
-  window.emberOpenCart=function(){
-    document.getElementById("ember-cart").classList.add("open");
-    document.getElementById("ember-overlay").style.display="block";
-    document.body.style.overflow="hidden";
-  };
-  window.emberCloseCart=function(){
-    document.getElementById("ember-cart").classList.remove("open");
-    document.getElementById("ember-overlay").style.display="none";
-    document.body.style.overflow="";
-  };
-  window.emberCheckout=async function(){
-    var sub=window.location.hostname.endsWith(".useember.io")?window.location.hostname.replace(".useember.io",""):null;
-    if(!sub){alert("Checkout works on your live store.");return;}
-    var btn=document.getElementById("ec-btn"),orig=btn.innerHTML;
-    btn.textContent="Processing…";btn.style.opacity="0.6";btn.style.pointerEvents="none";
+  // Ember analytics — pageview + live heartbeat
+  function getSub(){
+    var h = window.location.hostname;
+    if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
+    return null;
+  }
+  var sub = getSub();
+  if(!sub) return; // preview mode — don't track
+  // Anonymous visitor id
+  var vid = localStorage.getItem("ember_vid");
+  if(!vid){ vid = "v_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("ember_vid", vid); }
+  function send(isView){
     try{
-      var r=await fetch("/api/stripe/checkout",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({subdomain:sub,quantity:ecQty})
-      });
-      var d=await r.json();
-      if(d.url){window.location.href=d.url;}
-      else{alert(d.error||"Payments not set up yet.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-    }catch(e){alert("Something went wrong — please try again.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-  };
+      fetch("https://www.useember.io/api/track", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub, visitorId: vid, referrer: document.referrer || null, isView: isView }),
+        keepalive: true
+      }).catch(function(){});
+    }catch(e){}
+  }
+  send(true); // initial pageview
+  // Heartbeat every 30s while tab is visible
+  setInterval(function(){ if(document.visibilityState === "visible"){ send(false); } }, 30000);
 })();
 </script>
 </body>
@@ -1642,32 +1584,32 @@ export function generateTemplateHTML(
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <!-- Primary SEO -->
-<title>\${esc(store.brand)} — \${esc(productName)} | Free UK Shipping</title>
-<meta name="description" content="\${metaDesc}">
+<title>${esc(store.brand)} — ${esc(productName)} | Free UK Shipping</title>
+<meta name="description" content="${metaDesc}">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="\${storeUrl}">
+<link rel="canonical" href="${storeUrl}">
 
 <!-- Open Graph / Facebook -->
 <meta property="og:type" content="product">
-<meta property="og:url" content="\${storeUrl}">
-<meta property="og:title" content="\${esc(store.brand)} — \${esc(productName)}">
-<meta property="og:description" content="\${metaDesc}">
-<meta property="og:image" content="\${img}">
-<meta property="og:site_name" content="\${esc(store.brand)}">
-<meta property="product:price:amount" content="\${store.price?.replace(/[^0-9.]/g,'') || '0'}">
+<meta property="og:url" content="${storeUrl}">
+<meta property="og:title" content="${esc(store.brand)} — ${esc(productName)}">
+<meta property="og:description" content="${metaDesc}">
+<meta property="og:image" content="${img}">
+<meta property="og:site_name" content="${esc(store.brand)}">
+<meta property="product:price:amount" content="${store.price?.replace(/[^0-9.]/g,'') || '0'}">
 <meta property="product:price:currency" content="GBP">
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="\${esc(store.brand)} — \${esc(productName)}">
-<meta name="twitter:description" content="\${metaDesc}">
-<meta name="twitter:image" content="\${img}">
+<meta name="twitter:title" content="${esc(store.brand)} — ${esc(productName)}">
+<meta name="twitter:description" content="${metaDesc}">
+<meta name="twitter:image" content="${img}">
 
 <!-- Product Schema -->
-<script type="application/ld+json">\${productSchema}</script>
+<script type="application/ld+json">${productSchema}</script>
 
 <!-- Organisation Schema -->
-<script type="application/ld+json">\${orgSchema}</script>
+<script type="application/ld+json">${orgSchema}</script>
 
 <!-- Favicon -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
@@ -1896,20 +1838,38 @@ export function generateTemplateHTML(
 </div>
 <script>
 (function(){
-  // Ember cart — opens cart drawer on buy button click
+  // Ember universal checkout — wires all buy buttons to Stripe
   function getSubdomain(){
     var h = window.location.hostname;
     if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
     return null;
   }
-  function startCheckout(e){
+  async function startCheckout(e){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     var sub = getSubdomain();
-    if(!sub){ alert("This is a preview — checkout works on your live store."); return; }
-    emberOpenCart();
+    if(!sub){ alert("This is a preview. Checkout works on your live store."); return; }
+    var btn = e && e.currentTarget;
+    var original = btn ? btn.innerHTML : "";
+    if(btn){ btn.innerHTML = "Loading..."; btn.style.opacity = "0.7"; btn.style.pointerEvents = "none"; }
+    try{
+      var res = await fetch("https://www.useember.io/api/stripe/checkout", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub })
+      });
+      var data = await res.json();
+      if(data.url){ window.location.href = data.url; }
+      else {
+        alert(data.error || "Checkout is not set up yet. The store owner needs to connect payments.");
+        if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+      }
+    }catch(err){
+      alert("Something went wrong. Please try again.");
+      if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+    }
   }
-  // Attach to all buy button classes across all templates (incl. hero-cta)
-  var selectors = [".hero-cta",".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
+  // Attach to all known buy button classes across all templates
+  var selectors = [".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
   function attach(){
     document.querySelectorAll(selectors.join(",")).forEach(function(el){
       if(el.getAttribute("data-ember-checkout")) return;
@@ -1922,108 +1882,32 @@ export function generateTemplateHTML(
   } else { attach(); }
 })();
 </script>
-<style>
-#ember-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;backdrop-filter:blur(3px);}
-#ember-cart{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:400px;background:#fff;z-index:9999;transform:translateX(100%);transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 60px rgba(0,0,0,0.15);}
-#ember-cart.open{transform:translateX(0);}
-.ec-head{padding:20px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.ec-title{font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-close{width:32px;height:32px;border:none;background:rgba(0,0,0,0.06);border-radius:8px;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-body{flex:1;padding:24px;overflow-y:auto;}
-.ec-item{display:flex;gap:16px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #f3f4f6;}
-.ec-icon{width:72px;height:72px;background:#f9fafb;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.ec-name{font-size:14px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:6px;line-height:1.4;}
-.ec-price{font-size:17px;font-weight:800;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px;}
-.ec-qty-label{font-size:14px;color:#6b7280;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-ctrl{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-.ec-qty-btn{width:38px;height:38px;border:none;background:#fff;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-qty-btn:hover{background:#f9fafb;}
-.ec-qty-num{width:38px;text-align:center;font-size:15px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:38px;}
-.ec-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f9fafb;border-radius:12px;}
-.ec-total-label{font-size:14px;font-weight:600;color:#374151;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-total-val{font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-trust{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
-.ec-trust-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-foot{padding:20px 24px;border-top:1px solid #f3f4f6;flex-shrink:0;}
-.ec-checkout-btn{width:100%;padding:16px;border:none;color:#fff;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.01em;transition:opacity 0.15s;}
-.ec-checkout-btn:hover{opacity:0.9;}
-.ec-continue-btn{width:100%;padding:12px;border:none;background:transparent;color:#9ca3af;font-size:13px;cursor:pointer;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-@media(max-width:480px){#ember-cart{max-width:100%;}}
-</style>
-<div id="ember-overlay" onclick="emberCloseCart()"></div>
-<div id="ember-cart">
-  <div class="ec-head">
-    <span class="ec-title">Your bag</span>
-    <button class="ec-close" onclick="emberCloseCart()">&#x2715;</button>
-  </div>
-  <div class="ec-body">
-    <div class="ec-item">
-      <div class="ec-icon">&#x1F6CD;&#xFE0F;</div>
-      <div style="flex:1;min-width:0;">
-        <div class="ec-name">${esc(productName)}</div>
-        <div class="ec-price" style="color:${brandColor}">${esc(store.price)}</div>
-      </div>
-    </div>
-    <div class="ec-qty-row">
-      <span class="ec-qty-label">Quantity</span>
-      <div class="ec-qty-ctrl">
-        <button class="ec-qty-btn" onclick="emberQty(-1)">&#x2212;</button>
-        <span id="ec-qty" class="ec-qty-num">1</span>
-        <button class="ec-qty-btn" onclick="emberQty(1)">&#x2B;</button>
-      </div>
-    </div>
-    <div class="ec-total-row">
-      <span class="ec-total-label">Order total</span>
-      <span id="ec-total" class="ec-total-val">${esc(store.price)}</span>
-    </div>
-    <div class="ec-trust">
-      <div class="ec-trust-item">&#x1F512; Secure checkout powered by Stripe</div>
-      <div class="ec-trust-item">&#x21A9;&#xFE0F; 30-day money-back guarantee</div>
-      <div class="ec-trust-item">&#x26A1; Instant confirmation after purchase</div>
-    </div>
-  </div>
-  <div class="ec-foot">
-    <button id="ec-btn" class="ec-checkout-btn" style="background:${brandColor}" onclick="emberCheckout()">Checkout &#x2192; <span id="ec-btn-price">${esc(store.price)}</span></button>
-    <button class="ec-continue-btn" onclick="emberCloseCart()">Continue shopping</button>
-  </div>
-</div>
 <script>
 (function(){
-  var ecBase=parseFloat("${esc(store.price)}".replace(/[^0-9.]/g,""))*100|0,ecQty=1;
-  function ecFmt(p){return"£"+(p/100).toFixed(2);}
-  window.emberQty=function(d){
-    ecQty=Math.max(1,Math.min(ecQty+d,10));
-    document.getElementById("ec-qty").textContent=ecQty;
-    var t=ecFmt(ecBase*ecQty);
-    document.getElementById("ec-total").textContent=t;
-    document.getElementById("ec-btn-price").textContent=t;
-  };
-  window.emberOpenCart=function(){
-    document.getElementById("ember-cart").classList.add("open");
-    document.getElementById("ember-overlay").style.display="block";
-    document.body.style.overflow="hidden";
-  };
-  window.emberCloseCart=function(){
-    document.getElementById("ember-cart").classList.remove("open");
-    document.getElementById("ember-overlay").style.display="none";
-    document.body.style.overflow="";
-  };
-  window.emberCheckout=async function(){
-    var sub=window.location.hostname.endsWith(".useember.io")?window.location.hostname.replace(".useember.io",""):null;
-    if(!sub){alert("Checkout works on your live store.");return;}
-    var btn=document.getElementById("ec-btn"),orig=btn.innerHTML;
-    btn.textContent="Processing…";btn.style.opacity="0.6";btn.style.pointerEvents="none";
+  // Ember analytics — pageview + live heartbeat
+  function getSub(){
+    var h = window.location.hostname;
+    if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
+    return null;
+  }
+  var sub = getSub();
+  if(!sub) return; // preview mode — don't track
+  // Anonymous visitor id
+  var vid = localStorage.getItem("ember_vid");
+  if(!vid){ vid = "v_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("ember_vid", vid); }
+  function send(isView){
     try{
-      var r=await fetch("/api/stripe/checkout",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({subdomain:sub,quantity:ecQty})
-      });
-      var d=await r.json();
-      if(d.url){window.location.href=d.url;}
-      else{alert(d.error||"Payments not set up yet.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-    }catch(e){alert("Something went wrong — please try again.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-  };
+      fetch("https://www.useember.io/api/track", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub, visitorId: vid, referrer: document.referrer || null, isView: isView }),
+        keepalive: true
+      }).catch(function(){});
+    }catch(e){}
+  }
+  send(true); // initial pageview
+  // Heartbeat every 30s while tab is visible
+  setInterval(function(){ if(document.visibilityState === "visible"){ send(false); } }, 30000);
 })();
 </script>
 </body></html>`;
@@ -2229,20 +2113,38 @@ export function generateTemplateHTML(
 </div>
 <script>
 (function(){
-  // Ember cart — opens cart drawer on buy button click
+  // Ember universal checkout — wires all buy buttons to Stripe
   function getSubdomain(){
     var h = window.location.hostname;
     if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
     return null;
   }
-  function startCheckout(e){
+  async function startCheckout(e){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     var sub = getSubdomain();
-    if(!sub){ alert("This is a preview — checkout works on your live store."); return; }
-    emberOpenCart();
+    if(!sub){ alert("This is a preview. Checkout works on your live store."); return; }
+    var btn = e && e.currentTarget;
+    var original = btn ? btn.innerHTML : "";
+    if(btn){ btn.innerHTML = "Loading..."; btn.style.opacity = "0.7"; btn.style.pointerEvents = "none"; }
+    try{
+      var res = await fetch("https://www.useember.io/api/stripe/checkout", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub })
+      });
+      var data = await res.json();
+      if(data.url){ window.location.href = data.url; }
+      else {
+        alert(data.error || "Checkout is not set up yet. The store owner needs to connect payments.");
+        if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+      }
+    }catch(err){
+      alert("Something went wrong. Please try again.");
+      if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+    }
   }
-  // Attach to all buy button classes across all templates (incl. hero-cta)
-  var selectors = [".hero-cta",".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
+  // Attach to all known buy button classes across all templates
+  var selectors = [".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
   function attach(){
     document.querySelectorAll(selectors.join(",")).forEach(function(el){
       if(el.getAttribute("data-ember-checkout")) return;
@@ -2255,108 +2157,32 @@ export function generateTemplateHTML(
   } else { attach(); }
 })();
 </script>
-<style>
-#ember-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;backdrop-filter:blur(3px);}
-#ember-cart{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:400px;background:#fff;z-index:9999;transform:translateX(100%);transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 60px rgba(0,0,0,0.15);}
-#ember-cart.open{transform:translateX(0);}
-.ec-head{padding:20px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.ec-title{font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-close{width:32px;height:32px;border:none;background:rgba(0,0,0,0.06);border-radius:8px;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-body{flex:1;padding:24px;overflow-y:auto;}
-.ec-item{display:flex;gap:16px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #f3f4f6;}
-.ec-icon{width:72px;height:72px;background:#f9fafb;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.ec-name{font-size:14px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:6px;line-height:1.4;}
-.ec-price{font-size:17px;font-weight:800;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px;}
-.ec-qty-label{font-size:14px;color:#6b7280;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-ctrl{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-.ec-qty-btn{width:38px;height:38px;border:none;background:#fff;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-qty-btn:hover{background:#f9fafb;}
-.ec-qty-num{width:38px;text-align:center;font-size:15px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:38px;}
-.ec-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f9fafb;border-radius:12px;}
-.ec-total-label{font-size:14px;font-weight:600;color:#374151;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-total-val{font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-trust{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
-.ec-trust-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-foot{padding:20px 24px;border-top:1px solid #f3f4f6;flex-shrink:0;}
-.ec-checkout-btn{width:100%;padding:16px;border:none;color:#fff;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.01em;transition:opacity 0.15s;}
-.ec-checkout-btn:hover{opacity:0.9;}
-.ec-continue-btn{width:100%;padding:12px;border:none;background:transparent;color:#9ca3af;font-size:13px;cursor:pointer;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-@media(max-width:480px){#ember-cart{max-width:100%;}}
-</style>
-<div id="ember-overlay" onclick="emberCloseCart()"></div>
-<div id="ember-cart">
-  <div class="ec-head">
-    <span class="ec-title">Your bag</span>
-    <button class="ec-close" onclick="emberCloseCart()">&#x2715;</button>
-  </div>
-  <div class="ec-body">
-    <div class="ec-item">
-      <div class="ec-icon">&#x1F6CD;&#xFE0F;</div>
-      <div style="flex:1;min-width:0;">
-        <div class="ec-name">${esc(productName)}</div>
-        <div class="ec-price" style="color:${brandColor}">${esc(store.price)}</div>
-      </div>
-    </div>
-    <div class="ec-qty-row">
-      <span class="ec-qty-label">Quantity</span>
-      <div class="ec-qty-ctrl">
-        <button class="ec-qty-btn" onclick="emberQty(-1)">&#x2212;</button>
-        <span id="ec-qty" class="ec-qty-num">1</span>
-        <button class="ec-qty-btn" onclick="emberQty(1)">&#x2B;</button>
-      </div>
-    </div>
-    <div class="ec-total-row">
-      <span class="ec-total-label">Order total</span>
-      <span id="ec-total" class="ec-total-val">${esc(store.price)}</span>
-    </div>
-    <div class="ec-trust">
-      <div class="ec-trust-item">&#x1F512; Secure checkout powered by Stripe</div>
-      <div class="ec-trust-item">&#x21A9;&#xFE0F; 30-day money-back guarantee</div>
-      <div class="ec-trust-item">&#x26A1; Instant confirmation after purchase</div>
-    </div>
-  </div>
-  <div class="ec-foot">
-    <button id="ec-btn" class="ec-checkout-btn" style="background:${brandColor}" onclick="emberCheckout()">Checkout &#x2192; <span id="ec-btn-price">${esc(store.price)}</span></button>
-    <button class="ec-continue-btn" onclick="emberCloseCart()">Continue shopping</button>
-  </div>
-</div>
 <script>
 (function(){
-  var ecBase=parseFloat("${esc(store.price)}".replace(/[^0-9.]/g,""))*100|0,ecQty=1;
-  function ecFmt(p){return"£"+(p/100).toFixed(2);}
-  window.emberQty=function(d){
-    ecQty=Math.max(1,Math.min(ecQty+d,10));
-    document.getElementById("ec-qty").textContent=ecQty;
-    var t=ecFmt(ecBase*ecQty);
-    document.getElementById("ec-total").textContent=t;
-    document.getElementById("ec-btn-price").textContent=t;
-  };
-  window.emberOpenCart=function(){
-    document.getElementById("ember-cart").classList.add("open");
-    document.getElementById("ember-overlay").style.display="block";
-    document.body.style.overflow="hidden";
-  };
-  window.emberCloseCart=function(){
-    document.getElementById("ember-cart").classList.remove("open");
-    document.getElementById("ember-overlay").style.display="none";
-    document.body.style.overflow="";
-  };
-  window.emberCheckout=async function(){
-    var sub=window.location.hostname.endsWith(".useember.io")?window.location.hostname.replace(".useember.io",""):null;
-    if(!sub){alert("Checkout works on your live store.");return;}
-    var btn=document.getElementById("ec-btn"),orig=btn.innerHTML;
-    btn.textContent="Processing…";btn.style.opacity="0.6";btn.style.pointerEvents="none";
+  // Ember analytics — pageview + live heartbeat
+  function getSub(){
+    var h = window.location.hostname;
+    if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
+    return null;
+  }
+  var sub = getSub();
+  if(!sub) return; // preview mode — don't track
+  // Anonymous visitor id
+  var vid = localStorage.getItem("ember_vid");
+  if(!vid){ vid = "v_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("ember_vid", vid); }
+  function send(isView){
     try{
-      var r=await fetch("/api/stripe/checkout",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({subdomain:sub,quantity:ecQty})
-      });
-      var d=await r.json();
-      if(d.url){window.location.href=d.url;}
-      else{alert(d.error||"Payments not set up yet.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-    }catch(e){alert("Something went wrong — please try again.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-  };
+      fetch("https://www.useember.io/api/track", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub, visitorId: vid, referrer: document.referrer || null, isView: isView }),
+        keepalive: true
+      }).catch(function(){});
+    }catch(e){}
+  }
+  send(true); // initial pageview
+  // Heartbeat every 30s while tab is visible
+  setInterval(function(){ if(document.visibilityState === "visible"){ send(false); } }, 30000);
 })();
 </script>
 </body></html>`;
@@ -2547,20 +2373,38 @@ export function generateTemplateHTML(
 </div>
 <script>
 (function(){
-  // Ember cart — opens cart drawer on buy button click
+  // Ember universal checkout — wires all buy buttons to Stripe
   function getSubdomain(){
     var h = window.location.hostname;
     if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
     return null;
   }
-  function startCheckout(e){
+  async function startCheckout(e){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     var sub = getSubdomain();
-    if(!sub){ alert("This is a preview — checkout works on your live store."); return; }
-    emberOpenCart();
+    if(!sub){ alert("This is a preview. Checkout works on your live store."); return; }
+    var btn = e && e.currentTarget;
+    var original = btn ? btn.innerHTML : "";
+    if(btn){ btn.innerHTML = "Loading..."; btn.style.opacity = "0.7"; btn.style.pointerEvents = "none"; }
+    try{
+      var res = await fetch("https://www.useember.io/api/stripe/checkout", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub })
+      });
+      var data = await res.json();
+      if(data.url){ window.location.href = data.url; }
+      else {
+        alert(data.error || "Checkout is not set up yet. The store owner needs to connect payments.");
+        if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+      }
+    }catch(err){
+      alert("Something went wrong. Please try again.");
+      if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+    }
   }
-  // Attach to all buy button classes across all templates (incl. hero-cta)
-  var selectors = [".hero-cta",".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
+  // Attach to all known buy button classes across all templates
+  var selectors = [".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
   function attach(){
     document.querySelectorAll(selectors.join(",")).forEach(function(el){
       if(el.getAttribute("data-ember-checkout")) return;
@@ -2573,108 +2417,32 @@ export function generateTemplateHTML(
   } else { attach(); }
 })();
 </script>
-<style>
-#ember-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;backdrop-filter:blur(3px);}
-#ember-cart{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:400px;background:#fff;z-index:9999;transform:translateX(100%);transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 60px rgba(0,0,0,0.15);}
-#ember-cart.open{transform:translateX(0);}
-.ec-head{padding:20px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.ec-title{font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-close{width:32px;height:32px;border:none;background:rgba(0,0,0,0.06);border-radius:8px;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-body{flex:1;padding:24px;overflow-y:auto;}
-.ec-item{display:flex;gap:16px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #f3f4f6;}
-.ec-icon{width:72px;height:72px;background:#f9fafb;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.ec-name{font-size:14px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:6px;line-height:1.4;}
-.ec-price{font-size:17px;font-weight:800;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px;}
-.ec-qty-label{font-size:14px;color:#6b7280;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-ctrl{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-.ec-qty-btn{width:38px;height:38px;border:none;background:#fff;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-qty-btn:hover{background:#f9fafb;}
-.ec-qty-num{width:38px;text-align:center;font-size:15px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:38px;}
-.ec-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f9fafb;border-radius:12px;}
-.ec-total-label{font-size:14px;font-weight:600;color:#374151;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-total-val{font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-trust{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
-.ec-trust-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-foot{padding:20px 24px;border-top:1px solid #f3f4f6;flex-shrink:0;}
-.ec-checkout-btn{width:100%;padding:16px;border:none;color:#fff;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.01em;transition:opacity 0.15s;}
-.ec-checkout-btn:hover{opacity:0.9;}
-.ec-continue-btn{width:100%;padding:12px;border:none;background:transparent;color:#9ca3af;font-size:13px;cursor:pointer;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-@media(max-width:480px){#ember-cart{max-width:100%;}}
-</style>
-<div id="ember-overlay" onclick="emberCloseCart()"></div>
-<div id="ember-cart">
-  <div class="ec-head">
-    <span class="ec-title">Your bag</span>
-    <button class="ec-close" onclick="emberCloseCart()">&#x2715;</button>
-  </div>
-  <div class="ec-body">
-    <div class="ec-item">
-      <div class="ec-icon">&#x1F6CD;&#xFE0F;</div>
-      <div style="flex:1;min-width:0;">
-        <div class="ec-name">${esc(productName)}</div>
-        <div class="ec-price" style="color:${brandColor}">${esc(store.price)}</div>
-      </div>
-    </div>
-    <div class="ec-qty-row">
-      <span class="ec-qty-label">Quantity</span>
-      <div class="ec-qty-ctrl">
-        <button class="ec-qty-btn" onclick="emberQty(-1)">&#x2212;</button>
-        <span id="ec-qty" class="ec-qty-num">1</span>
-        <button class="ec-qty-btn" onclick="emberQty(1)">&#x2B;</button>
-      </div>
-    </div>
-    <div class="ec-total-row">
-      <span class="ec-total-label">Order total</span>
-      <span id="ec-total" class="ec-total-val">${esc(store.price)}</span>
-    </div>
-    <div class="ec-trust">
-      <div class="ec-trust-item">&#x1F512; Secure checkout powered by Stripe</div>
-      <div class="ec-trust-item">&#x21A9;&#xFE0F; 30-day money-back guarantee</div>
-      <div class="ec-trust-item">&#x26A1; Instant confirmation after purchase</div>
-    </div>
-  </div>
-  <div class="ec-foot">
-    <button id="ec-btn" class="ec-checkout-btn" style="background:${brandColor}" onclick="emberCheckout()">Checkout &#x2192; <span id="ec-btn-price">${esc(store.price)}</span></button>
-    <button class="ec-continue-btn" onclick="emberCloseCart()">Continue shopping</button>
-  </div>
-</div>
 <script>
 (function(){
-  var ecBase=parseFloat("${esc(store.price)}".replace(/[^0-9.]/g,""))*100|0,ecQty=1;
-  function ecFmt(p){return"£"+(p/100).toFixed(2);}
-  window.emberQty=function(d){
-    ecQty=Math.max(1,Math.min(ecQty+d,10));
-    document.getElementById("ec-qty").textContent=ecQty;
-    var t=ecFmt(ecBase*ecQty);
-    document.getElementById("ec-total").textContent=t;
-    document.getElementById("ec-btn-price").textContent=t;
-  };
-  window.emberOpenCart=function(){
-    document.getElementById("ember-cart").classList.add("open");
-    document.getElementById("ember-overlay").style.display="block";
-    document.body.style.overflow="hidden";
-  };
-  window.emberCloseCart=function(){
-    document.getElementById("ember-cart").classList.remove("open");
-    document.getElementById("ember-overlay").style.display="none";
-    document.body.style.overflow="";
-  };
-  window.emberCheckout=async function(){
-    var sub=window.location.hostname.endsWith(".useember.io")?window.location.hostname.replace(".useember.io",""):null;
-    if(!sub){alert("Checkout works on your live store.");return;}
-    var btn=document.getElementById("ec-btn"),orig=btn.innerHTML;
-    btn.textContent="Processing…";btn.style.opacity="0.6";btn.style.pointerEvents="none";
+  // Ember analytics — pageview + live heartbeat
+  function getSub(){
+    var h = window.location.hostname;
+    if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
+    return null;
+  }
+  var sub = getSub();
+  if(!sub) return; // preview mode — don't track
+  // Anonymous visitor id
+  var vid = localStorage.getItem("ember_vid");
+  if(!vid){ vid = "v_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("ember_vid", vid); }
+  function send(isView){
     try{
-      var r=await fetch("/api/stripe/checkout",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({subdomain:sub,quantity:ecQty})
-      });
-      var d=await r.json();
-      if(d.url){window.location.href=d.url;}
-      else{alert(d.error||"Payments not set up yet.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-    }catch(e){alert("Something went wrong — please try again.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-  };
+      fetch("https://www.useember.io/api/track", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub, visitorId: vid, referrer: document.referrer || null, isView: isView }),
+        keepalive: true
+      }).catch(function(){});
+    }catch(e){}
+  }
+  send(true); // initial pageview
+  // Heartbeat every 30s while tab is visible
+  setInterval(function(){ if(document.visibilityState === "visible"){ send(false); } }, 30000);
 })();
 </script>
 </body></html>`;
@@ -2870,20 +2638,38 @@ export function generateTemplateHTML(
 </div>
 <script>
 (function(){
-  // Ember cart — opens cart drawer on buy button click
+  // Ember universal checkout — wires all buy buttons to Stripe
   function getSubdomain(){
     var h = window.location.hostname;
     if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
     return null;
   }
-  function startCheckout(e){
+  async function startCheckout(e){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     var sub = getSubdomain();
-    if(!sub){ alert("This is a preview — checkout works on your live store."); return; }
-    emberOpenCart();
+    if(!sub){ alert("This is a preview. Checkout works on your live store."); return; }
+    var btn = e && e.currentTarget;
+    var original = btn ? btn.innerHTML : "";
+    if(btn){ btn.innerHTML = "Loading..."; btn.style.opacity = "0.7"; btn.style.pointerEvents = "none"; }
+    try{
+      var res = await fetch("https://www.useember.io/api/stripe/checkout", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub })
+      });
+      var data = await res.json();
+      if(data.url){ window.location.href = data.url; }
+      else {
+        alert(data.error || "Checkout is not set up yet. The store owner needs to connect payments.");
+        if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+      }
+    }catch(err){
+      alert("Something went wrong. Please try again.");
+      if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+    }
   }
-  // Attach to all buy button classes across all templates (incl. hero-cta)
-  var selectors = [".hero-cta",".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
+  // Attach to all known buy button classes across all templates
+  var selectors = [".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
   function attach(){
     document.querySelectorAll(selectors.join(",")).forEach(function(el){
       if(el.getAttribute("data-ember-checkout")) return;
@@ -2896,108 +2682,32 @@ export function generateTemplateHTML(
   } else { attach(); }
 })();
 </script>
-<style>
-#ember-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;backdrop-filter:blur(3px);}
-#ember-cart{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:400px;background:#fff;z-index:9999;transform:translateX(100%);transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 60px rgba(0,0,0,0.15);}
-#ember-cart.open{transform:translateX(0);}
-.ec-head{padding:20px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.ec-title{font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-close{width:32px;height:32px;border:none;background:rgba(0,0,0,0.06);border-radius:8px;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-body{flex:1;padding:24px;overflow-y:auto;}
-.ec-item{display:flex;gap:16px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #f3f4f6;}
-.ec-icon{width:72px;height:72px;background:#f9fafb;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.ec-name{font-size:14px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:6px;line-height:1.4;}
-.ec-price{font-size:17px;font-weight:800;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px;}
-.ec-qty-label{font-size:14px;color:#6b7280;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-ctrl{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-.ec-qty-btn{width:38px;height:38px;border:none;background:#fff;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-qty-btn:hover{background:#f9fafb;}
-.ec-qty-num{width:38px;text-align:center;font-size:15px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:38px;}
-.ec-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f9fafb;border-radius:12px;}
-.ec-total-label{font-size:14px;font-weight:600;color:#374151;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-total-val{font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-trust{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
-.ec-trust-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-foot{padding:20px 24px;border-top:1px solid #f3f4f6;flex-shrink:0;}
-.ec-checkout-btn{width:100%;padding:16px;border:none;color:#fff;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.01em;transition:opacity 0.15s;}
-.ec-checkout-btn:hover{opacity:0.9;}
-.ec-continue-btn{width:100%;padding:12px;border:none;background:transparent;color:#9ca3af;font-size:13px;cursor:pointer;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-@media(max-width:480px){#ember-cart{max-width:100%;}}
-</style>
-<div id="ember-overlay" onclick="emberCloseCart()"></div>
-<div id="ember-cart">
-  <div class="ec-head">
-    <span class="ec-title">Your bag</span>
-    <button class="ec-close" onclick="emberCloseCart()">&#x2715;</button>
-  </div>
-  <div class="ec-body">
-    <div class="ec-item">
-      <div class="ec-icon">&#x1F6CD;&#xFE0F;</div>
-      <div style="flex:1;min-width:0;">
-        <div class="ec-name">${esc(productName)}</div>
-        <div class="ec-price" style="color:${brandColor}">${esc(store.price)}</div>
-      </div>
-    </div>
-    <div class="ec-qty-row">
-      <span class="ec-qty-label">Quantity</span>
-      <div class="ec-qty-ctrl">
-        <button class="ec-qty-btn" onclick="emberQty(-1)">&#x2212;</button>
-        <span id="ec-qty" class="ec-qty-num">1</span>
-        <button class="ec-qty-btn" onclick="emberQty(1)">&#x2B;</button>
-      </div>
-    </div>
-    <div class="ec-total-row">
-      <span class="ec-total-label">Order total</span>
-      <span id="ec-total" class="ec-total-val">${esc(store.price)}</span>
-    </div>
-    <div class="ec-trust">
-      <div class="ec-trust-item">&#x1F512; Secure checkout powered by Stripe</div>
-      <div class="ec-trust-item">&#x21A9;&#xFE0F; 30-day money-back guarantee</div>
-      <div class="ec-trust-item">&#x26A1; Instant confirmation after purchase</div>
-    </div>
-  </div>
-  <div class="ec-foot">
-    <button id="ec-btn" class="ec-checkout-btn" style="background:${brandColor}" onclick="emberCheckout()">Checkout &#x2192; <span id="ec-btn-price">${esc(store.price)}</span></button>
-    <button class="ec-continue-btn" onclick="emberCloseCart()">Continue shopping</button>
-  </div>
-</div>
 <script>
 (function(){
-  var ecBase=parseFloat("${esc(store.price)}".replace(/[^0-9.]/g,""))*100|0,ecQty=1;
-  function ecFmt(p){return"£"+(p/100).toFixed(2);}
-  window.emberQty=function(d){
-    ecQty=Math.max(1,Math.min(ecQty+d,10));
-    document.getElementById("ec-qty").textContent=ecQty;
-    var t=ecFmt(ecBase*ecQty);
-    document.getElementById("ec-total").textContent=t;
-    document.getElementById("ec-btn-price").textContent=t;
-  };
-  window.emberOpenCart=function(){
-    document.getElementById("ember-cart").classList.add("open");
-    document.getElementById("ember-overlay").style.display="block";
-    document.body.style.overflow="hidden";
-  };
-  window.emberCloseCart=function(){
-    document.getElementById("ember-cart").classList.remove("open");
-    document.getElementById("ember-overlay").style.display="none";
-    document.body.style.overflow="";
-  };
-  window.emberCheckout=async function(){
-    var sub=window.location.hostname.endsWith(".useember.io")?window.location.hostname.replace(".useember.io",""):null;
-    if(!sub){alert("Checkout works on your live store.");return;}
-    var btn=document.getElementById("ec-btn"),orig=btn.innerHTML;
-    btn.textContent="Processing…";btn.style.opacity="0.6";btn.style.pointerEvents="none";
+  // Ember analytics — pageview + live heartbeat
+  function getSub(){
+    var h = window.location.hostname;
+    if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
+    return null;
+  }
+  var sub = getSub();
+  if(!sub) return; // preview mode — don't track
+  // Anonymous visitor id
+  var vid = localStorage.getItem("ember_vid");
+  if(!vid){ vid = "v_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("ember_vid", vid); }
+  function send(isView){
     try{
-      var r=await fetch("/api/stripe/checkout",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({subdomain:sub,quantity:ecQty})
-      });
-      var d=await r.json();
-      if(d.url){window.location.href=d.url;}
-      else{alert(d.error||"Payments not set up yet.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-    }catch(e){alert("Something went wrong — please try again.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-  };
+      fetch("https://www.useember.io/api/track", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub, visitorId: vid, referrer: document.referrer || null, isView: isView }),
+        keepalive: true
+      }).catch(function(){});
+    }catch(e){}
+  }
+  send(true); // initial pageview
+  // Heartbeat every 30s while tab is visible
+  setInterval(function(){ if(document.visibilityState === "visible"){ send(false); } }, 30000);
 })();
 </script>
 </body></html>`;
@@ -3127,20 +2837,38 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <footer class="footer">© ${new Date().getFullYear()} ${esc(store.brand)} · Digital download · Instant delivery · ⚡ Built with Ember 🔥</footer>
 <script>
 (function(){
-  // Ember cart — opens cart drawer on buy button click
+  // Ember universal checkout — wires all buy buttons to Stripe
   function getSubdomain(){
     var h = window.location.hostname;
     if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
     return null;
   }
-  function startCheckout(e){
+  async function startCheckout(e){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     var sub = getSubdomain();
-    if(!sub){ alert("This is a preview — checkout works on your live store."); return; }
-    emberOpenCart();
+    if(!sub){ alert("This is a preview. Checkout works on your live store."); return; }
+    var btn = e && e.currentTarget;
+    var original = btn ? btn.innerHTML : "";
+    if(btn){ btn.innerHTML = "Loading..."; btn.style.opacity = "0.7"; btn.style.pointerEvents = "none"; }
+    try{
+      var res = await fetch("https://www.useember.io/api/stripe/checkout", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub })
+      });
+      var data = await res.json();
+      if(data.url){ window.location.href = data.url; }
+      else {
+        alert(data.error || "Checkout is not set up yet. The store owner needs to connect payments.");
+        if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+      }
+    }catch(err){
+      alert("Something went wrong. Please try again.");
+      if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+    }
   }
-  // Attach to all buy button classes across all templates (incl. hero-cta)
-  var selectors = [".hero-cta",".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
+  // Attach to all known buy button classes across all templates
+  var selectors = [".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
   function attach(){
     document.querySelectorAll(selectors.join(",")).forEach(function(el){
       if(el.getAttribute("data-ember-checkout")) return;
@@ -3153,108 +2881,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   } else { attach(); }
 })();
 </script>
-<style>
-#ember-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;backdrop-filter:blur(3px);}
-#ember-cart{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:400px;background:#fff;z-index:9999;transform:translateX(100%);transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 60px rgba(0,0,0,0.15);}
-#ember-cart.open{transform:translateX(0);}
-.ec-head{padding:20px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.ec-title{font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-close{width:32px;height:32px;border:none;background:rgba(0,0,0,0.06);border-radius:8px;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-body{flex:1;padding:24px;overflow-y:auto;}
-.ec-item{display:flex;gap:16px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #f3f4f6;}
-.ec-icon{width:72px;height:72px;background:#f9fafb;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.ec-name{font-size:14px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:6px;line-height:1.4;}
-.ec-price{font-size:17px;font-weight:800;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px;}
-.ec-qty-label{font-size:14px;color:#6b7280;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-ctrl{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-.ec-qty-btn{width:38px;height:38px;border:none;background:#fff;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-qty-btn:hover{background:#f9fafb;}
-.ec-qty-num{width:38px;text-align:center;font-size:15px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:38px;}
-.ec-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f9fafb;border-radius:12px;}
-.ec-total-label{font-size:14px;font-weight:600;color:#374151;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-total-val{font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-trust{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
-.ec-trust-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-foot{padding:20px 24px;border-top:1px solid #f3f4f6;flex-shrink:0;}
-.ec-checkout-btn{width:100%;padding:16px;border:none;color:#fff;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.01em;transition:opacity 0.15s;}
-.ec-checkout-btn:hover{opacity:0.9;}
-.ec-continue-btn{width:100%;padding:12px;border:none;background:transparent;color:#9ca3af;font-size:13px;cursor:pointer;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-@media(max-width:480px){#ember-cart{max-width:100%;}}
-</style>
-<div id="ember-overlay" onclick="emberCloseCart()"></div>
-<div id="ember-cart">
-  <div class="ec-head">
-    <span class="ec-title">Your bag</span>
-    <button class="ec-close" onclick="emberCloseCart()">&#x2715;</button>
-  </div>
-  <div class="ec-body">
-    <div class="ec-item">
-      <div class="ec-icon">&#x1F6CD;&#xFE0F;</div>
-      <div style="flex:1;min-width:0;">
-        <div class="ec-name">${esc(productName)}</div>
-        <div class="ec-price" style="color:${brandColor}">${esc(store.price)}</div>
-      </div>
-    </div>
-    <div class="ec-qty-row">
-      <span class="ec-qty-label">Quantity</span>
-      <div class="ec-qty-ctrl">
-        <button class="ec-qty-btn" onclick="emberQty(-1)">&#x2212;</button>
-        <span id="ec-qty" class="ec-qty-num">1</span>
-        <button class="ec-qty-btn" onclick="emberQty(1)">&#x2B;</button>
-      </div>
-    </div>
-    <div class="ec-total-row">
-      <span class="ec-total-label">Order total</span>
-      <span id="ec-total" class="ec-total-val">${esc(store.price)}</span>
-    </div>
-    <div class="ec-trust">
-      <div class="ec-trust-item">&#x1F512; Secure checkout powered by Stripe</div>
-      <div class="ec-trust-item">&#x21A9;&#xFE0F; 30-day money-back guarantee</div>
-      <div class="ec-trust-item">&#x26A1; Instant confirmation after purchase</div>
-    </div>
-  </div>
-  <div class="ec-foot">
-    <button id="ec-btn" class="ec-checkout-btn" style="background:${brandColor}" onclick="emberCheckout()">Checkout &#x2192; <span id="ec-btn-price">${esc(store.price)}</span></button>
-    <button class="ec-continue-btn" onclick="emberCloseCart()">Continue shopping</button>
-  </div>
-</div>
 <script>
 (function(){
-  var ecBase=parseFloat("${esc(store.price)}".replace(/[^0-9.]/g,""))*100|0,ecQty=1;
-  function ecFmt(p){return"£"+(p/100).toFixed(2);}
-  window.emberQty=function(d){
-    ecQty=Math.max(1,Math.min(ecQty+d,10));
-    document.getElementById("ec-qty").textContent=ecQty;
-    var t=ecFmt(ecBase*ecQty);
-    document.getElementById("ec-total").textContent=t;
-    document.getElementById("ec-btn-price").textContent=t;
-  };
-  window.emberOpenCart=function(){
-    document.getElementById("ember-cart").classList.add("open");
-    document.getElementById("ember-overlay").style.display="block";
-    document.body.style.overflow="hidden";
-  };
-  window.emberCloseCart=function(){
-    document.getElementById("ember-cart").classList.remove("open");
-    document.getElementById("ember-overlay").style.display="none";
-    document.body.style.overflow="";
-  };
-  window.emberCheckout=async function(){
-    var sub=window.location.hostname.endsWith(".useember.io")?window.location.hostname.replace(".useember.io",""):null;
-    if(!sub){alert("Checkout works on your live store.");return;}
-    var btn=document.getElementById("ec-btn"),orig=btn.innerHTML;
-    btn.textContent="Processing…";btn.style.opacity="0.6";btn.style.pointerEvents="none";
+  // Ember analytics — pageview + live heartbeat
+  function getSub(){
+    var h = window.location.hostname;
+    if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
+    return null;
+  }
+  var sub = getSub();
+  if(!sub) return; // preview mode — don't track
+  // Anonymous visitor id
+  var vid = localStorage.getItem("ember_vid");
+  if(!vid){ vid = "v_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("ember_vid", vid); }
+  function send(isView){
     try{
-      var r=await fetch("/api/stripe/checkout",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({subdomain:sub,quantity:ecQty})
-      });
-      var d=await r.json();
-      if(d.url){window.location.href=d.url;}
-      else{alert(d.error||"Payments not set up yet.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-    }catch(e){alert("Something went wrong — please try again.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-  };
+      fetch("https://www.useember.io/api/track", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub, visitorId: vid, referrer: document.referrer || null, isView: isView }),
+        keepalive: true
+      }).catch(function(){});
+    }catch(e){}
+  }
+  send(true); // initial pageview
+  // Heartbeat every 30s while tab is visible
+  setInterval(function(){ if(document.visibilityState === "visible"){ send(false); } }, 30000);
 })();
 </script>
 </body>
@@ -3370,20 +3022,38 @@ body{font-family:Georgia,'Times New Roman',serif;background:#fdfdf9;color:#1a1a1
 <footer class="footer">© ${new Date().getFullYear()} ${esc(store.brand)} · PDF Guide · Instant download · ⚡ Built with Ember 🔥</footer>
 <script>
 (function(){
-  // Ember cart — opens cart drawer on buy button click
+  // Ember universal checkout — wires all buy buttons to Stripe
   function getSubdomain(){
     var h = window.location.hostname;
     if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
     return null;
   }
-  function startCheckout(e){
+  async function startCheckout(e){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     var sub = getSubdomain();
-    if(!sub){ alert("This is a preview — checkout works on your live store."); return; }
-    emberOpenCart();
+    if(!sub){ alert("This is a preview. Checkout works on your live store."); return; }
+    var btn = e && e.currentTarget;
+    var original = btn ? btn.innerHTML : "";
+    if(btn){ btn.innerHTML = "Loading..."; btn.style.opacity = "0.7"; btn.style.pointerEvents = "none"; }
+    try{
+      var res = await fetch("https://www.useember.io/api/stripe/checkout", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub })
+      });
+      var data = await res.json();
+      if(data.url){ window.location.href = data.url; }
+      else {
+        alert(data.error || "Checkout is not set up yet. The store owner needs to connect payments.");
+        if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+      }
+    }catch(err){
+      alert("Something went wrong. Please try again.");
+      if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+    }
   }
-  // Attach to all buy button classes across all templates (incl. hero-cta)
-  var selectors = [".hero-cta",".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
+  // Attach to all known buy button classes across all templates
+  var selectors = [".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
   function attach(){
     document.querySelectorAll(selectors.join(",")).forEach(function(el){
       if(el.getAttribute("data-ember-checkout")) return;
@@ -3396,108 +3066,32 @@ body{font-family:Georgia,'Times New Roman',serif;background:#fdfdf9;color:#1a1a1
   } else { attach(); }
 })();
 </script>
-<style>
-#ember-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;backdrop-filter:blur(3px);}
-#ember-cart{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:400px;background:#fff;z-index:9999;transform:translateX(100%);transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 60px rgba(0,0,0,0.15);}
-#ember-cart.open{transform:translateX(0);}
-.ec-head{padding:20px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.ec-title{font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-close{width:32px;height:32px;border:none;background:rgba(0,0,0,0.06);border-radius:8px;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-body{flex:1;padding:24px;overflow-y:auto;}
-.ec-item{display:flex;gap:16px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #f3f4f6;}
-.ec-icon{width:72px;height:72px;background:#f9fafb;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.ec-name{font-size:14px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:6px;line-height:1.4;}
-.ec-price{font-size:17px;font-weight:800;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px;}
-.ec-qty-label{font-size:14px;color:#6b7280;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-ctrl{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-.ec-qty-btn{width:38px;height:38px;border:none;background:#fff;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-qty-btn:hover{background:#f9fafb;}
-.ec-qty-num{width:38px;text-align:center;font-size:15px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:38px;}
-.ec-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f9fafb;border-radius:12px;}
-.ec-total-label{font-size:14px;font-weight:600;color:#374151;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-total-val{font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-trust{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
-.ec-trust-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-foot{padding:20px 24px;border-top:1px solid #f3f4f6;flex-shrink:0;}
-.ec-checkout-btn{width:100%;padding:16px;border:none;color:#fff;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.01em;transition:opacity 0.15s;}
-.ec-checkout-btn:hover{opacity:0.9;}
-.ec-continue-btn{width:100%;padding:12px;border:none;background:transparent;color:#9ca3af;font-size:13px;cursor:pointer;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-@media(max-width:480px){#ember-cart{max-width:100%;}}
-</style>
-<div id="ember-overlay" onclick="emberCloseCart()"></div>
-<div id="ember-cart">
-  <div class="ec-head">
-    <span class="ec-title">Your bag</span>
-    <button class="ec-close" onclick="emberCloseCart()">&#x2715;</button>
-  </div>
-  <div class="ec-body">
-    <div class="ec-item">
-      <div class="ec-icon">&#x1F6CD;&#xFE0F;</div>
-      <div style="flex:1;min-width:0;">
-        <div class="ec-name">${esc(productName)}</div>
-        <div class="ec-price" style="color:${brandColor}">${esc(store.price)}</div>
-      </div>
-    </div>
-    <div class="ec-qty-row">
-      <span class="ec-qty-label">Quantity</span>
-      <div class="ec-qty-ctrl">
-        <button class="ec-qty-btn" onclick="emberQty(-1)">&#x2212;</button>
-        <span id="ec-qty" class="ec-qty-num">1</span>
-        <button class="ec-qty-btn" onclick="emberQty(1)">&#x2B;</button>
-      </div>
-    </div>
-    <div class="ec-total-row">
-      <span class="ec-total-label">Order total</span>
-      <span id="ec-total" class="ec-total-val">${esc(store.price)}</span>
-    </div>
-    <div class="ec-trust">
-      <div class="ec-trust-item">&#x1F512; Secure checkout powered by Stripe</div>
-      <div class="ec-trust-item">&#x21A9;&#xFE0F; 30-day money-back guarantee</div>
-      <div class="ec-trust-item">&#x26A1; Instant confirmation after purchase</div>
-    </div>
-  </div>
-  <div class="ec-foot">
-    <button id="ec-btn" class="ec-checkout-btn" style="background:${brandColor}" onclick="emberCheckout()">Checkout &#x2192; <span id="ec-btn-price">${esc(store.price)}</span></button>
-    <button class="ec-continue-btn" onclick="emberCloseCart()">Continue shopping</button>
-  </div>
-</div>
 <script>
 (function(){
-  var ecBase=parseFloat("${esc(store.price)}".replace(/[^0-9.]/g,""))*100|0,ecQty=1;
-  function ecFmt(p){return"£"+(p/100).toFixed(2);}
-  window.emberQty=function(d){
-    ecQty=Math.max(1,Math.min(ecQty+d,10));
-    document.getElementById("ec-qty").textContent=ecQty;
-    var t=ecFmt(ecBase*ecQty);
-    document.getElementById("ec-total").textContent=t;
-    document.getElementById("ec-btn-price").textContent=t;
-  };
-  window.emberOpenCart=function(){
-    document.getElementById("ember-cart").classList.add("open");
-    document.getElementById("ember-overlay").style.display="block";
-    document.body.style.overflow="hidden";
-  };
-  window.emberCloseCart=function(){
-    document.getElementById("ember-cart").classList.remove("open");
-    document.getElementById("ember-overlay").style.display="none";
-    document.body.style.overflow="";
-  };
-  window.emberCheckout=async function(){
-    var sub=window.location.hostname.endsWith(".useember.io")?window.location.hostname.replace(".useember.io",""):null;
-    if(!sub){alert("Checkout works on your live store.");return;}
-    var btn=document.getElementById("ec-btn"),orig=btn.innerHTML;
-    btn.textContent="Processing…";btn.style.opacity="0.6";btn.style.pointerEvents="none";
+  // Ember analytics — pageview + live heartbeat
+  function getSub(){
+    var h = window.location.hostname;
+    if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
+    return null;
+  }
+  var sub = getSub();
+  if(!sub) return; // preview mode — don't track
+  // Anonymous visitor id
+  var vid = localStorage.getItem("ember_vid");
+  if(!vid){ vid = "v_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("ember_vid", vid); }
+  function send(isView){
     try{
-      var r=await fetch("/api/stripe/checkout",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({subdomain:sub,quantity:ecQty})
-      });
-      var d=await r.json();
-      if(d.url){window.location.href=d.url;}
-      else{alert(d.error||"Payments not set up yet.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-    }catch(e){alert("Something went wrong — please try again.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-  };
+      fetch("https://www.useember.io/api/track", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub, visitorId: vid, referrer: document.referrer || null, isView: isView }),
+        keepalive: true
+      }).catch(function(){});
+    }catch(e){}
+  }
+  send(true); // initial pageview
+  // Heartbeat every 30s while tab is visible
+  setInterval(function(){ if(document.visibilityState === "visible"){ send(false); } }, 30000);
 })();
 </script>
 </body>
@@ -3609,20 +3203,38 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <footer class="footer">© ${new Date().getFullYear()} ${esc(store.brand)} · Digital product · ⚡ Built with Ember 🔥</footer>
 <script>
 (function(){
-  // Ember cart — opens cart drawer on buy button click
+  // Ember universal checkout — wires all buy buttons to Stripe
   function getSubdomain(){
     var h = window.location.hostname;
     if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
     return null;
   }
-  function startCheckout(e){
+  async function startCheckout(e){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     var sub = getSubdomain();
-    if(!sub){ alert("This is a preview — checkout works on your live store."); return; }
-    emberOpenCart();
+    if(!sub){ alert("This is a preview. Checkout works on your live store."); return; }
+    var btn = e && e.currentTarget;
+    var original = btn ? btn.innerHTML : "";
+    if(btn){ btn.innerHTML = "Loading..."; btn.style.opacity = "0.7"; btn.style.pointerEvents = "none"; }
+    try{
+      var res = await fetch("https://www.useember.io/api/stripe/checkout", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub })
+      });
+      var data = await res.json();
+      if(data.url){ window.location.href = data.url; }
+      else {
+        alert(data.error || "Checkout is not set up yet. The store owner needs to connect payments.");
+        if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+      }
+    }catch(err){
+      alert("Something went wrong. Please try again.");
+      if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+    }
   }
-  // Attach to all buy button classes across all templates (incl. hero-cta)
-  var selectors = [".hero-cta",".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
+  // Attach to all known buy button classes across all templates
+  var selectors = [".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
   function attach(){
     document.querySelectorAll(selectors.join(",")).forEach(function(el){
       if(el.getAttribute("data-ember-checkout")) return;
@@ -3635,108 +3247,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   } else { attach(); }
 })();
 </script>
-<style>
-#ember-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;backdrop-filter:blur(3px);}
-#ember-cart{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:400px;background:#fff;z-index:9999;transform:translateX(100%);transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 60px rgba(0,0,0,0.15);}
-#ember-cart.open{transform:translateX(0);}
-.ec-head{padding:20px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.ec-title{font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-close{width:32px;height:32px;border:none;background:rgba(0,0,0,0.06);border-radius:8px;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-body{flex:1;padding:24px;overflow-y:auto;}
-.ec-item{display:flex;gap:16px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #f3f4f6;}
-.ec-icon{width:72px;height:72px;background:#f9fafb;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.ec-name{font-size:14px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:6px;line-height:1.4;}
-.ec-price{font-size:17px;font-weight:800;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px;}
-.ec-qty-label{font-size:14px;color:#6b7280;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-ctrl{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-.ec-qty-btn{width:38px;height:38px;border:none;background:#fff;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-qty-btn:hover{background:#f9fafb;}
-.ec-qty-num{width:38px;text-align:center;font-size:15px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:38px;}
-.ec-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f9fafb;border-radius:12px;}
-.ec-total-label{font-size:14px;font-weight:600;color:#374151;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-total-val{font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-trust{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
-.ec-trust-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-foot{padding:20px 24px;border-top:1px solid #f3f4f6;flex-shrink:0;}
-.ec-checkout-btn{width:100%;padding:16px;border:none;color:#fff;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.01em;transition:opacity 0.15s;}
-.ec-checkout-btn:hover{opacity:0.9;}
-.ec-continue-btn{width:100%;padding:12px;border:none;background:transparent;color:#9ca3af;font-size:13px;cursor:pointer;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-@media(max-width:480px){#ember-cart{max-width:100%;}}
-</style>
-<div id="ember-overlay" onclick="emberCloseCart()"></div>
-<div id="ember-cart">
-  <div class="ec-head">
-    <span class="ec-title">Your bag</span>
-    <button class="ec-close" onclick="emberCloseCart()">&#x2715;</button>
-  </div>
-  <div class="ec-body">
-    <div class="ec-item">
-      <div class="ec-icon">&#x1F6CD;&#xFE0F;</div>
-      <div style="flex:1;min-width:0;">
-        <div class="ec-name">${esc(productName)}</div>
-        <div class="ec-price" style="color:${brandColor}">${esc(store.price)}</div>
-      </div>
-    </div>
-    <div class="ec-qty-row">
-      <span class="ec-qty-label">Quantity</span>
-      <div class="ec-qty-ctrl">
-        <button class="ec-qty-btn" onclick="emberQty(-1)">&#x2212;</button>
-        <span id="ec-qty" class="ec-qty-num">1</span>
-        <button class="ec-qty-btn" onclick="emberQty(1)">&#x2B;</button>
-      </div>
-    </div>
-    <div class="ec-total-row">
-      <span class="ec-total-label">Order total</span>
-      <span id="ec-total" class="ec-total-val">${esc(store.price)}</span>
-    </div>
-    <div class="ec-trust">
-      <div class="ec-trust-item">&#x1F512; Secure checkout powered by Stripe</div>
-      <div class="ec-trust-item">&#x21A9;&#xFE0F; 30-day money-back guarantee</div>
-      <div class="ec-trust-item">&#x26A1; Instant confirmation after purchase</div>
-    </div>
-  </div>
-  <div class="ec-foot">
-    <button id="ec-btn" class="ec-checkout-btn" style="background:${brandColor}" onclick="emberCheckout()">Checkout &#x2192; <span id="ec-btn-price">${esc(store.price)}</span></button>
-    <button class="ec-continue-btn" onclick="emberCloseCart()">Continue shopping</button>
-  </div>
-</div>
 <script>
 (function(){
-  var ecBase=parseFloat("${esc(store.price)}".replace(/[^0-9.]/g,""))*100|0,ecQty=1;
-  function ecFmt(p){return"£"+(p/100).toFixed(2);}
-  window.emberQty=function(d){
-    ecQty=Math.max(1,Math.min(ecQty+d,10));
-    document.getElementById("ec-qty").textContent=ecQty;
-    var t=ecFmt(ecBase*ecQty);
-    document.getElementById("ec-total").textContent=t;
-    document.getElementById("ec-btn-price").textContent=t;
-  };
-  window.emberOpenCart=function(){
-    document.getElementById("ember-cart").classList.add("open");
-    document.getElementById("ember-overlay").style.display="block";
-    document.body.style.overflow="hidden";
-  };
-  window.emberCloseCart=function(){
-    document.getElementById("ember-cart").classList.remove("open");
-    document.getElementById("ember-overlay").style.display="none";
-    document.body.style.overflow="";
-  };
-  window.emberCheckout=async function(){
-    var sub=window.location.hostname.endsWith(".useember.io")?window.location.hostname.replace(".useember.io",""):null;
-    if(!sub){alert("Checkout works on your live store.");return;}
-    var btn=document.getElementById("ec-btn"),orig=btn.innerHTML;
-    btn.textContent="Processing…";btn.style.opacity="0.6";btn.style.pointerEvents="none";
+  // Ember analytics — pageview + live heartbeat
+  function getSub(){
+    var h = window.location.hostname;
+    if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
+    return null;
+  }
+  var sub = getSub();
+  if(!sub) return; // preview mode — don't track
+  // Anonymous visitor id
+  var vid = localStorage.getItem("ember_vid");
+  if(!vid){ vid = "v_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("ember_vid", vid); }
+  function send(isView){
     try{
-      var r=await fetch("/api/stripe/checkout",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({subdomain:sub,quantity:ecQty})
-      });
-      var d=await r.json();
-      if(d.url){window.location.href=d.url;}
-      else{alert(d.error||"Payments not set up yet.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-    }catch(e){alert("Something went wrong — please try again.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-  };
+      fetch("https://www.useember.io/api/track", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub, visitorId: vid, referrer: document.referrer || null, isView: isView }),
+        keepalive: true
+      }).catch(function(){});
+    }catch(e){}
+  }
+  send(true); // initial pageview
+  // Heartbeat every 30s while tab is visible
+  setInterval(function(){ if(document.visibilityState === "visible"){ send(false); } }, 30000);
 })();
 </script>
 </body>
@@ -3852,20 +3388,38 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <footer class="footer">© ${new Date().getFullYear()} ${esc(store.brand)} · Digital template · Instant download · ⚡ Built with Ember 🔥</footer>
 <script>
 (function(){
-  // Ember cart — opens cart drawer on buy button click
+  // Ember universal checkout — wires all buy buttons to Stripe
   function getSubdomain(){
     var h = window.location.hostname;
     if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
     return null;
   }
-  function startCheckout(e){
+  async function startCheckout(e){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     var sub = getSubdomain();
-    if(!sub){ alert("This is a preview — checkout works on your live store."); return; }
-    emberOpenCart();
+    if(!sub){ alert("This is a preview. Checkout works on your live store."); return; }
+    var btn = e && e.currentTarget;
+    var original = btn ? btn.innerHTML : "";
+    if(btn){ btn.innerHTML = "Loading..."; btn.style.opacity = "0.7"; btn.style.pointerEvents = "none"; }
+    try{
+      var res = await fetch("https://www.useember.io/api/stripe/checkout", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub })
+      });
+      var data = await res.json();
+      if(data.url){ window.location.href = data.url; }
+      else {
+        alert(data.error || "Checkout is not set up yet. The store owner needs to connect payments.");
+        if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+      }
+    }catch(err){
+      alert("Something went wrong. Please try again.");
+      if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+    }
   }
-  // Attach to all buy button classes across all templates (incl. hero-cta)
-  var selectors = [".hero-cta",".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
+  // Attach to all known buy button classes across all templates
+  var selectors = [".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
   function attach(){
     document.querySelectorAll(selectors.join(",")).forEach(function(el){
       if(el.getAttribute("data-ember-checkout")) return;
@@ -3878,108 +3432,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   } else { attach(); }
 })();
 </script>
-<style>
-#ember-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;backdrop-filter:blur(3px);}
-#ember-cart{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:400px;background:#fff;z-index:9999;transform:translateX(100%);transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 60px rgba(0,0,0,0.15);}
-#ember-cart.open{transform:translateX(0);}
-.ec-head{padding:20px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.ec-title{font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-close{width:32px;height:32px;border:none;background:rgba(0,0,0,0.06);border-radius:8px;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-body{flex:1;padding:24px;overflow-y:auto;}
-.ec-item{display:flex;gap:16px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #f3f4f6;}
-.ec-icon{width:72px;height:72px;background:#f9fafb;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.ec-name{font-size:14px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:6px;line-height:1.4;}
-.ec-price{font-size:17px;font-weight:800;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px;}
-.ec-qty-label{font-size:14px;color:#6b7280;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-ctrl{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-.ec-qty-btn{width:38px;height:38px;border:none;background:#fff;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-qty-btn:hover{background:#f9fafb;}
-.ec-qty-num{width:38px;text-align:center;font-size:15px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:38px;}
-.ec-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f9fafb;border-radius:12px;}
-.ec-total-label{font-size:14px;font-weight:600;color:#374151;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-total-val{font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-trust{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
-.ec-trust-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-foot{padding:20px 24px;border-top:1px solid #f3f4f6;flex-shrink:0;}
-.ec-checkout-btn{width:100%;padding:16px;border:none;color:#fff;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.01em;transition:opacity 0.15s;}
-.ec-checkout-btn:hover{opacity:0.9;}
-.ec-continue-btn{width:100%;padding:12px;border:none;background:transparent;color:#9ca3af;font-size:13px;cursor:pointer;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-@media(max-width:480px){#ember-cart{max-width:100%;}}
-</style>
-<div id="ember-overlay" onclick="emberCloseCart()"></div>
-<div id="ember-cart">
-  <div class="ec-head">
-    <span class="ec-title">Your bag</span>
-    <button class="ec-close" onclick="emberCloseCart()">&#x2715;</button>
-  </div>
-  <div class="ec-body">
-    <div class="ec-item">
-      <div class="ec-icon">&#x1F6CD;&#xFE0F;</div>
-      <div style="flex:1;min-width:0;">
-        <div class="ec-name">${esc(productName)}</div>
-        <div class="ec-price" style="color:${brandColor}">${esc(store.price)}</div>
-      </div>
-    </div>
-    <div class="ec-qty-row">
-      <span class="ec-qty-label">Quantity</span>
-      <div class="ec-qty-ctrl">
-        <button class="ec-qty-btn" onclick="emberQty(-1)">&#x2212;</button>
-        <span id="ec-qty" class="ec-qty-num">1</span>
-        <button class="ec-qty-btn" onclick="emberQty(1)">&#x2B;</button>
-      </div>
-    </div>
-    <div class="ec-total-row">
-      <span class="ec-total-label">Order total</span>
-      <span id="ec-total" class="ec-total-val">${esc(store.price)}</span>
-    </div>
-    <div class="ec-trust">
-      <div class="ec-trust-item">&#x1F512; Secure checkout powered by Stripe</div>
-      <div class="ec-trust-item">&#x21A9;&#xFE0F; 30-day money-back guarantee</div>
-      <div class="ec-trust-item">&#x26A1; Instant confirmation after purchase</div>
-    </div>
-  </div>
-  <div class="ec-foot">
-    <button id="ec-btn" class="ec-checkout-btn" style="background:${brandColor}" onclick="emberCheckout()">Checkout &#x2192; <span id="ec-btn-price">${esc(store.price)}</span></button>
-    <button class="ec-continue-btn" onclick="emberCloseCart()">Continue shopping</button>
-  </div>
-</div>
 <script>
 (function(){
-  var ecBase=parseFloat("${esc(store.price)}".replace(/[^0-9.]/g,""))*100|0,ecQty=1;
-  function ecFmt(p){return"£"+(p/100).toFixed(2);}
-  window.emberQty=function(d){
-    ecQty=Math.max(1,Math.min(ecQty+d,10));
-    document.getElementById("ec-qty").textContent=ecQty;
-    var t=ecFmt(ecBase*ecQty);
-    document.getElementById("ec-total").textContent=t;
-    document.getElementById("ec-btn-price").textContent=t;
-  };
-  window.emberOpenCart=function(){
-    document.getElementById("ember-cart").classList.add("open");
-    document.getElementById("ember-overlay").style.display="block";
-    document.body.style.overflow="hidden";
-  };
-  window.emberCloseCart=function(){
-    document.getElementById("ember-cart").classList.remove("open");
-    document.getElementById("ember-overlay").style.display="none";
-    document.body.style.overflow="";
-  };
-  window.emberCheckout=async function(){
-    var sub=window.location.hostname.endsWith(".useember.io")?window.location.hostname.replace(".useember.io",""):null;
-    if(!sub){alert("Checkout works on your live store.");return;}
-    var btn=document.getElementById("ec-btn"),orig=btn.innerHTML;
-    btn.textContent="Processing…";btn.style.opacity="0.6";btn.style.pointerEvents="none";
+  // Ember analytics — pageview + live heartbeat
+  function getSub(){
+    var h = window.location.hostname;
+    if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
+    return null;
+  }
+  var sub = getSub();
+  if(!sub) return; // preview mode — don't track
+  // Anonymous visitor id
+  var vid = localStorage.getItem("ember_vid");
+  if(!vid){ vid = "v_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("ember_vid", vid); }
+  function send(isView){
     try{
-      var r=await fetch("/api/stripe/checkout",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({subdomain:sub,quantity:ecQty})
-      });
-      var d=await r.json();
-      if(d.url){window.location.href=d.url;}
-      else{alert(d.error||"Payments not set up yet.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-    }catch(e){alert("Something went wrong — please try again.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-  };
+      fetch("https://www.useember.io/api/track", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub, visitorId: vid, referrer: document.referrer || null, isView: isView }),
+        keepalive: true
+      }).catch(function(){});
+    }catch(e){}
+  }
+  send(true); // initial pageview
+  // Heartbeat every 30s while tab is visible
+  setInterval(function(){ if(document.visibilityState === "visible"){ send(false); } }, 30000);
 })();
 </script>
 </body>
@@ -4260,20 +3738,38 @@ document.getElementById("d-sold").textContent = Math.floor(Math.random()*(60-20)
 </script>
 <script>
 (function(){
-  // Ember cart — opens cart drawer on buy button click
+  // Ember universal checkout — wires all buy buttons to Stripe
   function getSubdomain(){
     var h = window.location.hostname;
     if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
     return null;
   }
-  function startCheckout(e){
+  async function startCheckout(e){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     var sub = getSubdomain();
-    if(!sub){ alert("This is a preview — checkout works on your live store."); return; }
-    emberOpenCart();
+    if(!sub){ alert("This is a preview. Checkout works on your live store."); return; }
+    var btn = e && e.currentTarget;
+    var original = btn ? btn.innerHTML : "";
+    if(btn){ btn.innerHTML = "Loading..."; btn.style.opacity = "0.7"; btn.style.pointerEvents = "none"; }
+    try{
+      var res = await fetch("https://www.useember.io/api/stripe/checkout", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub })
+      });
+      var data = await res.json();
+      if(data.url){ window.location.href = data.url; }
+      else {
+        alert(data.error || "Checkout is not set up yet. The store owner needs to connect payments.");
+        if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+      }
+    }catch(err){
+      alert("Something went wrong. Please try again.");
+      if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+    }
   }
-  // Attach to all buy button classes across all templates (incl. hero-cta)
-  var selectors = [".hero-cta",".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
+  // Attach to all known buy button classes across all templates
+  var selectors = [".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
   function attach(){
     document.querySelectorAll(selectors.join(",")).forEach(function(el){
       if(el.getAttribute("data-ember-checkout")) return;
@@ -4286,108 +3782,32 @@ document.getElementById("d-sold").textContent = Math.floor(Math.random()*(60-20)
   } else { attach(); }
 })();
 </script>
-<style>
-#ember-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;backdrop-filter:blur(3px);}
-#ember-cart{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:400px;background:#fff;z-index:9999;transform:translateX(100%);transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 60px rgba(0,0,0,0.15);}
-#ember-cart.open{transform:translateX(0);}
-.ec-head{padding:20px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.ec-title{font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-close{width:32px;height:32px;border:none;background:rgba(0,0,0,0.06);border-radius:8px;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-body{flex:1;padding:24px;overflow-y:auto;}
-.ec-item{display:flex;gap:16px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #f3f4f6;}
-.ec-icon{width:72px;height:72px;background:#f9fafb;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.ec-name{font-size:14px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:6px;line-height:1.4;}
-.ec-price{font-size:17px;font-weight:800;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px;}
-.ec-qty-label{font-size:14px;color:#6b7280;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-ctrl{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-.ec-qty-btn{width:38px;height:38px;border:none;background:#fff;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-qty-btn:hover{background:#f9fafb;}
-.ec-qty-num{width:38px;text-align:center;font-size:15px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:38px;}
-.ec-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f9fafb;border-radius:12px;}
-.ec-total-label{font-size:14px;font-weight:600;color:#374151;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-total-val{font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-trust{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
-.ec-trust-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-foot{padding:20px 24px;border-top:1px solid #f3f4f6;flex-shrink:0;}
-.ec-checkout-btn{width:100%;padding:16px;border:none;color:#fff;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.01em;transition:opacity 0.15s;}
-.ec-checkout-btn:hover{opacity:0.9;}
-.ec-continue-btn{width:100%;padding:12px;border:none;background:transparent;color:#9ca3af;font-size:13px;cursor:pointer;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-@media(max-width:480px){#ember-cart{max-width:100%;}}
-</style>
-<div id="ember-overlay" onclick="emberCloseCart()"></div>
-<div id="ember-cart">
-  <div class="ec-head">
-    <span class="ec-title">Your bag</span>
-    <button class="ec-close" onclick="emberCloseCart()">&#x2715;</button>
-  </div>
-  <div class="ec-body">
-    <div class="ec-item">
-      <div class="ec-icon">&#x1F6CD;&#xFE0F;</div>
-      <div style="flex:1;min-width:0;">
-        <div class="ec-name">${esc(productName)}</div>
-        <div class="ec-price" style="color:${brandColor}">${esc(store.price)}</div>
-      </div>
-    </div>
-    <div class="ec-qty-row">
-      <span class="ec-qty-label">Quantity</span>
-      <div class="ec-qty-ctrl">
-        <button class="ec-qty-btn" onclick="emberQty(-1)">&#x2212;</button>
-        <span id="ec-qty" class="ec-qty-num">1</span>
-        <button class="ec-qty-btn" onclick="emberQty(1)">&#x2B;</button>
-      </div>
-    </div>
-    <div class="ec-total-row">
-      <span class="ec-total-label">Order total</span>
-      <span id="ec-total" class="ec-total-val">${esc(store.price)}</span>
-    </div>
-    <div class="ec-trust">
-      <div class="ec-trust-item">&#x1F512; Secure checkout powered by Stripe</div>
-      <div class="ec-trust-item">&#x21A9;&#xFE0F; 30-day money-back guarantee</div>
-      <div class="ec-trust-item">&#x26A1; Instant confirmation after purchase</div>
-    </div>
-  </div>
-  <div class="ec-foot">
-    <button id="ec-btn" class="ec-checkout-btn" style="background:${brandColor}" onclick="emberCheckout()">Checkout &#x2192; <span id="ec-btn-price">${esc(store.price)}</span></button>
-    <button class="ec-continue-btn" onclick="emberCloseCart()">Continue shopping</button>
-  </div>
-</div>
 <script>
 (function(){
-  var ecBase=parseFloat("${esc(store.price)}".replace(/[^0-9.]/g,""))*100|0,ecQty=1;
-  function ecFmt(p){return"£"+(p/100).toFixed(2);}
-  window.emberQty=function(d){
-    ecQty=Math.max(1,Math.min(ecQty+d,10));
-    document.getElementById("ec-qty").textContent=ecQty;
-    var t=ecFmt(ecBase*ecQty);
-    document.getElementById("ec-total").textContent=t;
-    document.getElementById("ec-btn-price").textContent=t;
-  };
-  window.emberOpenCart=function(){
-    document.getElementById("ember-cart").classList.add("open");
-    document.getElementById("ember-overlay").style.display="block";
-    document.body.style.overflow="hidden";
-  };
-  window.emberCloseCart=function(){
-    document.getElementById("ember-cart").classList.remove("open");
-    document.getElementById("ember-overlay").style.display="none";
-    document.body.style.overflow="";
-  };
-  window.emberCheckout=async function(){
-    var sub=window.location.hostname.endsWith(".useember.io")?window.location.hostname.replace(".useember.io",""):null;
-    if(!sub){alert("Checkout works on your live store.");return;}
-    var btn=document.getElementById("ec-btn"),orig=btn.innerHTML;
-    btn.textContent="Processing…";btn.style.opacity="0.6";btn.style.pointerEvents="none";
+  // Ember analytics — pageview + live heartbeat
+  function getSub(){
+    var h = window.location.hostname;
+    if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
+    return null;
+  }
+  var sub = getSub();
+  if(!sub) return; // preview mode — don't track
+  // Anonymous visitor id
+  var vid = localStorage.getItem("ember_vid");
+  if(!vid){ vid = "v_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("ember_vid", vid); }
+  function send(isView){
     try{
-      var r=await fetch("/api/stripe/checkout",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({subdomain:sub,quantity:ecQty})
-      });
-      var d=await r.json();
-      if(d.url){window.location.href=d.url;}
-      else{alert(d.error||"Payments not set up yet.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-    }catch(e){alert("Something went wrong — please try again.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-  };
+      fetch("https://www.useember.io/api/track", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub, visitorId: vid, referrer: document.referrer || null, isView: isView }),
+        keepalive: true
+      }).catch(function(){});
+    }catch(e){}
+  }
+  send(true); // initial pageview
+  // Heartbeat every 30s while tab is visible
+  setInterval(function(){ if(document.visibilityState === "visible"){ send(false); } }, 30000);
 })();
 </script>
 </body>
@@ -4608,20 +4028,38 @@ document.getElementById("c-viewers").textContent = Math.floor(Math.random()*(30-
 </script>
 <script>
 (function(){
-  // Ember cart — opens cart drawer on buy button click
+  // Ember universal checkout — wires all buy buttons to Stripe
   function getSubdomain(){
     var h = window.location.hostname;
     if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
     return null;
   }
-  function startCheckout(e){
+  async function startCheckout(e){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     var sub = getSubdomain();
-    if(!sub){ alert("This is a preview — checkout works on your live store."); return; }
-    emberOpenCart();
+    if(!sub){ alert("This is a preview. Checkout works on your live store."); return; }
+    var btn = e && e.currentTarget;
+    var original = btn ? btn.innerHTML : "";
+    if(btn){ btn.innerHTML = "Loading..."; btn.style.opacity = "0.7"; btn.style.pointerEvents = "none"; }
+    try{
+      var res = await fetch("https://www.useember.io/api/stripe/checkout", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub })
+      });
+      var data = await res.json();
+      if(data.url){ window.location.href = data.url; }
+      else {
+        alert(data.error || "Checkout is not set up yet. The store owner needs to connect payments.");
+        if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+      }
+    }catch(err){
+      alert("Something went wrong. Please try again.");
+      if(btn){ btn.innerHTML = original; btn.style.opacity = "1"; btn.style.pointerEvents = "auto"; }
+    }
   }
-  // Attach to all buy button classes across all templates (incl. hero-cta)
-  var selectors = [".hero-cta",".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
+  // Attach to all known buy button classes across all templates
+  var selectors = [".scroll-cta",".sticky-cta",".header-cta",".final-cta-btn",".d-cta",".d-nav-cta",".d-final-cta",".c-enrol",".c-nav-cta",".sticky-cart-btn",".cta-btn",".nav-cta"];
   function attach(){
     document.querySelectorAll(selectors.join(",")).forEach(function(el){
       if(el.getAttribute("data-ember-checkout")) return;
@@ -4634,108 +4072,32 @@ document.getElementById("c-viewers").textContent = Math.floor(Math.random()*(30-
   } else { attach(); }
 })();
 </script>
-<style>
-#ember-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;backdrop-filter:blur(3px);}
-#ember-cart{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:400px;background:#fff;z-index:9999;transform:translateX(100%);transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 60px rgba(0,0,0,0.15);}
-#ember-cart.open{transform:translateX(0);}
-.ec-head{padding:20px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.ec-title{font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-close{width:32px;height:32px;border:none;background:rgba(0,0,0,0.06);border-radius:8px;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-body{flex:1;padding:24px;overflow-y:auto;}
-.ec-item{display:flex;gap:16px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #f3f4f6;}
-.ec-icon{width:72px;height:72px;background:#f9fafb;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.ec-name{font-size:14px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:6px;line-height:1.4;}
-.ec-price{font-size:17px;font-weight:800;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px;}
-.ec-qty-label{font-size:14px;color:#6b7280;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-qty-ctrl{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-.ec-qty-btn{width:38px;height:38px;border:none;background:#fff;cursor:pointer;font-size:20px;color:#374151;display:flex;align-items:center;justify-content:center;line-height:1;}
-.ec-qty-btn:hover{background:#f9fafb;}
-.ec-qty-num{width:38px;text-align:center;font-size:15px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:38px;}
-.ec-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f9fafb;border-radius:12px;}
-.ec-total-label{font-size:14px;font-weight:600;color:#374151;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-total-val{font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-trust{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
-.ec-trust-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-.ec-foot{padding:20px 24px;border-top:1px solid #f3f4f6;flex-shrink:0;}
-.ec-checkout-btn{width:100%;padding:16px;border:none;color:#fff;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.01em;transition:opacity 0.15s;}
-.ec-checkout-btn:hover{opacity:0.9;}
-.ec-continue-btn{width:100%;padding:12px;border:none;background:transparent;color:#9ca3af;font-size:13px;cursor:pointer;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-@media(max-width:480px){#ember-cart{max-width:100%;}}
-</style>
-<div id="ember-overlay" onclick="emberCloseCart()"></div>
-<div id="ember-cart">
-  <div class="ec-head">
-    <span class="ec-title">Your bag</span>
-    <button class="ec-close" onclick="emberCloseCart()">&#x2715;</button>
-  </div>
-  <div class="ec-body">
-    <div class="ec-item">
-      <div class="ec-icon">&#x1F6CD;&#xFE0F;</div>
-      <div style="flex:1;min-width:0;">
-        <div class="ec-name">${esc(productName)}</div>
-        <div class="ec-price" style="color:${brandColor}">${esc(store.price)}</div>
-      </div>
-    </div>
-    <div class="ec-qty-row">
-      <span class="ec-qty-label">Quantity</span>
-      <div class="ec-qty-ctrl">
-        <button class="ec-qty-btn" onclick="emberQty(-1)">&#x2212;</button>
-        <span id="ec-qty" class="ec-qty-num">1</span>
-        <button class="ec-qty-btn" onclick="emberQty(1)">&#x2B;</button>
-      </div>
-    </div>
-    <div class="ec-total-row">
-      <span class="ec-total-label">Order total</span>
-      <span id="ec-total" class="ec-total-val">${esc(store.price)}</span>
-    </div>
-    <div class="ec-trust">
-      <div class="ec-trust-item">&#x1F512; Secure checkout powered by Stripe</div>
-      <div class="ec-trust-item">&#x21A9;&#xFE0F; 30-day money-back guarantee</div>
-      <div class="ec-trust-item">&#x26A1; Instant confirmation after purchase</div>
-    </div>
-  </div>
-  <div class="ec-foot">
-    <button id="ec-btn" class="ec-checkout-btn" style="background:${brandColor}" onclick="emberCheckout()">Checkout &#x2192; <span id="ec-btn-price">${esc(store.price)}</span></button>
-    <button class="ec-continue-btn" onclick="emberCloseCart()">Continue shopping</button>
-  </div>
-</div>
 <script>
 (function(){
-  var ecBase=parseFloat("${esc(store.price)}".replace(/[^0-9.]/g,""))*100|0,ecQty=1;
-  function ecFmt(p){return"£"+(p/100).toFixed(2);}
-  window.emberQty=function(d){
-    ecQty=Math.max(1,Math.min(ecQty+d,10));
-    document.getElementById("ec-qty").textContent=ecQty;
-    var t=ecFmt(ecBase*ecQty);
-    document.getElementById("ec-total").textContent=t;
-    document.getElementById("ec-btn-price").textContent=t;
-  };
-  window.emberOpenCart=function(){
-    document.getElementById("ember-cart").classList.add("open");
-    document.getElementById("ember-overlay").style.display="block";
-    document.body.style.overflow="hidden";
-  };
-  window.emberCloseCart=function(){
-    document.getElementById("ember-cart").classList.remove("open");
-    document.getElementById("ember-overlay").style.display="none";
-    document.body.style.overflow="";
-  };
-  window.emberCheckout=async function(){
-    var sub=window.location.hostname.endsWith(".useember.io")?window.location.hostname.replace(".useember.io",""):null;
-    if(!sub){alert("Checkout works on your live store.");return;}
-    var btn=document.getElementById("ec-btn"),orig=btn.innerHTML;
-    btn.textContent="Processing…";btn.style.opacity="0.6";btn.style.pointerEvents="none";
+  // Ember analytics — pageview + live heartbeat
+  function getSub(){
+    var h = window.location.hostname;
+    if(h.endsWith(".useember.io")) return h.replace(".useember.io","");
+    return null;
+  }
+  var sub = getSub();
+  if(!sub) return; // preview mode — don't track
+  // Anonymous visitor id
+  var vid = localStorage.getItem("ember_vid");
+  if(!vid){ vid = "v_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("ember_vid", vid); }
+  function send(isView){
     try{
-      var r=await fetch("/api/stripe/checkout",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({subdomain:sub,quantity:ecQty})
-      });
-      var d=await r.json();
-      if(d.url){window.location.href=d.url;}
-      else{alert(d.error||"Payments not set up yet.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-    }catch(e){alert("Something went wrong — please try again.");btn.innerHTML=orig;btn.style.opacity="1";btn.style.pointerEvents="auto";}
-  };
+      fetch("https://www.useember.io/api/track", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ subdomain: sub, visitorId: vid, referrer: document.referrer || null, isView: isView }),
+        keepalive: true
+      }).catch(function(){});
+    }catch(e){}
+  }
+  send(true); // initial pageview
+  // Heartbeat every 30s while tab is visible
+  setInterval(function(){ if(document.visibilityState === "visible"){ send(false); } }, 30000);
 })();
 </script>
 </body>
